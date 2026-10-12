@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.3-alpine3.23
+        env:
+          POSTGRES_DB: eso_me_sirve_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eso_me_sirve_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/eso_me_sirve_test
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Fijar npm
+        run: npm install --global npm@11.19.0
+
+      - name: Instalar dependencias reproducibles
+        run: npm ci
+
+      - name: Aplicar migraciones desde una base vacía
+        run: npm run db:migrate
+
+      - name: Validar TypeScript
+        run: npm run typecheck
+
+      - name: Ejecutar ESLint
+        run: npm run lint
+
+      - name: Ejecutar pruebas unitarias
+        run: npm run test
+
+      - name: Compilar producción
+        run: npm run build
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e

@@ -2,7 +2,7 @@
 
 | ID | Trabajo | Dependencias | Estado |
 |---|---|---|---|
-| EMS-000 | Bootstrap Next.js / PostgreSQL / Docker / PWA / CI / pruebas | Arquitectura aprobada | LISTO PARA CODEX |
+| EMS-000 | Bootstrap Next.js / PostgreSQL / Docker / PWA / CI / pruebas | Arquitectura aprobada | COMPLETADO 2026-10-12 |
 | EMS-001 | Diseño UX y navegación mobile-first | EMS-000 | PENDIENTE |
 | EMS-002 | Identidad, roles y autorizaciones | EMS-000 + auth decidida | PENDIENTE |
 | EMS-003 | Publicaciones y fotografías | EMS-002 + storage | PENDIENTE |

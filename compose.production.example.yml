@@ -1,0 +1,54 @@
+name: eso-me-sirve-production-example
+
+# Referencia operativa solamente. Requiere revisión de secretos, backups,
+# observabilidad, límites y endurecimiento antes de cualquier despliegue.
+services:
+  proxy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Define APP_DOMAIN outside Git}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile.example:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [frontend]
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Inject DATABASE_URL from a secret store}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks: [frontend, backend]
+
+  db:
+    image: postgres:18.3-alpine3.23
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Inject outside Git}
+      POSTGRES_USER: ${POSTGRES_USER:?Inject outside Git}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Inject outside Git}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks: [backend]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+
+networks:
+  frontend:
+  backend:
+    internal: true
