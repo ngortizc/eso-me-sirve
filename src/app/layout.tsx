@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { PwaRegistrar } from "@/app/pwa-registrar";
+import { SiteShell } from "@/components/layout/site-shell";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -19,15 +20,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#173a31",
+  themeColor: "#126B5A",
   colorScheme: "light"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es-CL">
+    <html lang="es-CL" data-scroll-behavior="smooth">
       <body>
-        {children}
+        <SiteShell>{children}</SiteShell>
         <PwaRegistrar />
       </body>
     </html>

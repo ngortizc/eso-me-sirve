@@ -28,6 +28,10 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres@127.0.0.1:5432/eso_me_sirve_test
+      BETTER_AUTH_SECRET: ci-only-identity-secret-never-use-in-production-32
+      BETTER_AUTH_URL: http://127.0.0.1:3100
+      APP_ENV: development
+      EMAIL_DELIVERY_MODE: database
       CI: true
     steps:
       - name: Checkout

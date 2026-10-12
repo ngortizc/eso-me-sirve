@@ -1,3 +1,3 @@
 # Profiles
 
-Perfiles y datos personales; su acceso siempre deberá autorizarse en servidor.
+Perfiles mínimos de cuenta. El repositorio PostgreSQL retorna un DTO sin correo, credenciales, tokens ni datos de contacto y se invoca solo después de comprobar sesión, rol y propiedad en servidor.

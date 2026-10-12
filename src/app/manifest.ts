@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Dale una nueva vida a lo que ya no usas.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f7f3e8",
-    theme_color: "#173a31",
+    background_color: "#f7f8f5",
+    theme_color: "#126b5a",
     lang: "es-CL",
     orientation: "portrait-primary",
     icons: [

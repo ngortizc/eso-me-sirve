@@ -17,11 +17,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e": "node --env-file-if-exists=.env scripts/run-e2e.mjs",
+    "mailbox:latest": "node --env-file-if-exists=.env scripts/read-dev-mailbox.mjs",
     "db:migrate": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m db/migrations --migration-file-language sql up",
     "db:migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m db/migrations --migration-file-language sql down"
   },
   "dependencies": {
+    "better-auth": "1.7.7",
     "next": "16.4.0",
     "pg": "8.23.1",
     "react": "19.3.0",

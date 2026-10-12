@@ -7,7 +7,13 @@ const server = spawn(
   process.execPath,
   ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)],
   {
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+    env: {
+      ...process.env,
+      NEXT_TELEMETRY_DISABLED: "1",
+      BETTER_AUTH_URL: `http://127.0.0.1:${port}`,
+      APP_ENV: "development",
+      EMAIL_DELIVERY_MODE: "database"
+    },
     stdio: "inherit",
     windowsHide: true,
     detached: !isWindows

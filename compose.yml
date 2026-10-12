@@ -29,6 +29,10 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:?Define POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:?Define POSTGRES_DB in .env}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Define BETTER_AUTH_SECRET in .env}
+      BETTER_AUTH_URL: http://localhost:3000
+      APP_ENV: development
+      EMAIL_DELIVERY_MODE: database
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

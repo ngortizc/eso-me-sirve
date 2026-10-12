@@ -9,7 +9,11 @@ RUN npm ci
 
 FROM toolchain AS builder
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    DATABASE_URL=postgresql://build:build@127.0.0.1:1/build \
+    BETTER_AUTH_SECRET=build-only-placeholder-not-used-at-runtime-32 \
+    BETTER_AUTH_URL=http://127.0.0.1:3000 \
+    BETTER_AUTH_VALIDATE_SCHEMA=false
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

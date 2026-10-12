@@ -1,6 +1,6 @@
 # Eso Me Sirve
 
-Base técnica de la aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-000 contiene infraestructura, portada y pruebas; **todavía no habilita cuentas, publicaciones, reservas, pagos, contacto ni entregas reales**.
+Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-002 incorpora cuentas reales locales, verificación de correo, recuperación, sesiones y autorización. Publicaciones, solicitudes, reservas, pagos, contacto y entregas continúan como demostración sin persistencia.
 
 ## Requisitos
 
@@ -20,6 +20,7 @@ Base técnica de la aplicación web responsive/PWA para dar una nueva vida a art
 | Tailwind CSS | 4.3.3 |
 | PostgreSQL | 18.3-alpine3.23 |
 | `pg` / `node-pg-migrate` | 8.23.1 / 9.0.0 |
+| Better Auth | 1.7.7 |
 | Vitest / Playwright | 5.0.4 / 1.64.0 |
 
 ## Configuración local
@@ -50,6 +51,21 @@ npm run dev
 
 Abre `http://localhost:3000`. Comprueba `GET /api/health/live` para proceso y `GET /api/health/ready` para proceso + PostgreSQL. Readiness responde `503` de forma deliberada cuando la base no está disponible.
 
+### Probar registro e ingreso
+
+1. Abre `/registro`, crea una cuenta con contraseña de al menos 12 caracteres y espera la pantalla de verificación.
+2. Consulta el enlace local sin enviar correo real:
+
+```powershell
+npm run mailbox:latest -- persona@example.cl EMAIL_VERIFICATION
+```
+
+3. Abre el enlace una vez. Luego ingresa en `/ingresar`. Para recuperación usa `/recuperar` y consulta `PASSWORD_RESET` con el mismo comando.
+
+El buzón contiene enlaces secretos: úsalo solo en desarrollo, no publiques su salida y no lo habilites en producción. El registro productivo permanece deshabilitado hasta aprobar e implementar un proveedor de correo.
+
+El prototipo incluye `/explorar`, detalles en `/articulos/[slug]`, `/publicar`, `/mis-cosas` y `/conexion`. Los controles interactivos son locales y las acciones dejan claro que no persisten datos ni ejecutan transacciones. En `/publicar`, las fotografías seleccionadas permanecen solo en memoria y sus previsualizaciones se liberan al eliminarlas o abandonar la vista.
+
 ## Comandos
 
 | Comando | Propósito |
@@ -58,7 +74,8 @@ Abre `http://localhost:3000`. Comprueba `GET /api/health/live` para proceso y `G
 | `npm run typecheck` | TypeScript estricto sin emitir archivos |
 | `npm run lint` | ESLint con reglas Next.js/Core Web Vitals |
 | `npm run test` | Pruebas unitarias Vitest |
-| `npm run test:e2e` | Smoke E2E móvil/escritorio y health/PWA |
+| `npm run test:e2e` | E2E móvil/escritorio, identidad, health/PWA y capturas en `evidencias/EMS-001.1` y `evidencias/EMS-002` |
+| `npm run mailbox:latest -- correo tipo` | Lee explícitamente el último correo local de identidad |
 | `npm run build` | Compilación standalone de producción |
 | `npm run db:migrate` | Migraciones SQL pendientes hacia arriba |
 | `docker compose --profile app up --build` | Aplicación y DB en contenedores locales |
@@ -68,13 +85,13 @@ Antes del primer E2E instala Chromium una vez con `npx playwright install chromi
 ## Arquitectura
 
 - `src/app`: App Router, interfaz y adaptadores HTTP.
-- `src/modules`: límites futuros de identidad, perfiles, publicaciones, catálogo, reservas, entregas, facturación, moderación, notificaciones y auditoría.
+- `src/modules`: límites modulares; identidad y perfiles mínimos están implementados, los demás dominios permanecen pendientes.
 - `src/shared`: puertos y capacidades transversales mínimas; health y logging en EMS-000.
 - `db/migrations`: migraciones SQL ordenadas con `node-pg-migrate`. El ORM continúa pendiente.
 - `tests/e2e`: pruebas Playwright en viewport móvil y escritorio.
 - `deploy`: referencia Caddy/HTTPS, no un despliegue productivo.
 
-El dominio futuro no debe importar Next.js, `pg`, persistencia ni APIs externas. Autorización y validación sensible ocurrirán en servidor. Ningún dato de teléfono o dirección exacta debe aparecer en catálogo, HTML público, metadata, logs o respuestas no autorizadas.
+El dominio no importa Next.js, `pg`, persistencia ni APIs externas. Autorización y validación sensible ocurren en servidor. Ningún dato de teléfono o dirección exacta aparece en catálogo, HTML público, metadata, logs o respuestas no autorizadas.
 
 ## PWA y caché
 

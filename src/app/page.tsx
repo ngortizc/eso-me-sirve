@@ -1,116 +1,82 @@
-const steps = [
-  {
-    number: "01",
-    title: "Publica lo que ya no usas",
-    description: "Describe el artículo y define una comuna y condiciones de entrega, sin exponer datos privados."
-  },
-  {
-    number: "02",
-    title: "Elige una solicitud",
-    description: "Quien publica decide a qué persona reservar el artículo. Una aceptación a la vez."
-  },
-  {
-    number: "03",
-    title: "Coordinen con privacidad",
-    description: "El contacto se habilitará únicamente después de una reserva aceptada y un pago confirmado."
-  }
+import Image from "next/image";
+import Link from "next/link";
+import { ArticleCard } from "@/components/catalog/article-card";
+import { DemoBadge } from "@/components/ui/demo-badge";
+import { Icon } from "@/components/ui/icon";
+import { demoArticles } from "@/shared/demo/catalog";
+
+const categories = [
+  { label: "Hogar", symbol: "◒", tone: "bg-fresh/15 text-green-deep" },
+  { label: "Infantil", symbol: "✦", tone: "bg-amber/20 text-[#744a18]" },
+  { label: "Libros", symbol: "▤", tone: "bg-ink/8 text-ink" },
+  { label: "Plantas", symbol: "⌁", tone: "bg-green-deep/10 text-green-deep" }
 ] as const;
 
-const principles = [
-  ["$0", "El artículo siempre es gratuito"],
-  ["Privado", "Contacto protegido hasta que corresponda"],
-  ["Local", "Pensado para encuentros en tu comuna"]
+const steps = [
+  ["1", "Encuentra algo útil", "Explora artículos gratuitos cerca de tu comuna."],
+  ["2", "Envía tu solicitud", "La persona que publica elige a quién reservar."],
+  ["3", "Conecta con seguridad", "Tras la aceptación y el pago confirmado, se habilita el contacto."]
 ] as const;
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-hidden">
-      <nav aria-label="Navegación principal" className="mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8 lg:px-12">
-        <a className="flex items-center gap-3 font-black tracking-tight text-forest" href="#inicio" aria-label="Eso Me Sirve, inicio">
-          <span className="grid size-10 place-items-center rounded-2xl bg-forest text-lg text-cream shadow-sm" aria-hidden="true">↻</span>
-          <span className="text-lg sm:text-xl">Eso Me Sirve</span>
-        </a>
-        <a className="rounded-full border border-forest/20 bg-white/60 px-4 py-2 text-sm font-bold text-forest transition hover:border-forest/50 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest" href="#como-funciona">
-          Cómo funcionará
-        </a>
-      </nav>
+    <main className="flex flex-col">
+      <section className="order-1 relative overflow-hidden bg-ink text-white">
+        <div className="absolute -right-32 -top-32 size-[30rem] rounded-full bg-fresh/15 blur-3xl" aria-hidden="true" />
+        <div className="page-container relative grid gap-7 py-8 sm:py-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-12">
+          <div className="z-10">
+            <DemoBadge />
+            <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.17em] text-fresh">Compartir nos hace bien</p>
+            <h1 className="mt-3 max-w-2xl text-balance text-4xl font-black leading-[1.03] tracking-[-0.045em] sm:text-5xl lg:text-6xl">Dale una nueva vida a lo que ya no usas</h1>
+            <p className="mt-4 max-w-xl text-pretty text-base leading-7 text-white/72 sm:text-lg">Encuentra artículos gratis cerca de ti y conecta con personas de tu comunidad de forma simple y protegida.</p>
+            <form className="mt-6 grid max-w-2xl gap-2 rounded-card bg-white p-2 shadow-2xl sm:grid-cols-[1fr_0.72fr_auto]" action="/explorar">
+              <label className="relative flex min-h-12 items-center border-b border-ink/10 sm:border-b-0 sm:border-r">
+                <Icon className="ml-3 size-5 shrink-0 text-green-deep" name="search" />
+                <span className="sr-only">Buscar artículos</span>
+                <input className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-medium text-ink outline-none placeholder:text-muted" name="q" placeholder="¿Qué estás buscando?" />
+              </label>
+              <label className="relative flex min-h-12 items-center">
+                <Icon className="ml-3 size-5 shrink-0 text-green-deep" name="location" />
+                <span className="sr-only">Comuna</span>
+                <select className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold text-ink outline-none" name="comuna" defaultValue="Todas">
+                  <option value="Todas">Toda ubicación</option><option>Ñuñoa</option><option>Providencia</option><option>Santiago</option><option>La Florida</option>
+                </select>
+              </label>
+              <button className="button button-primary !rounded-xl !px-5" type="submit">Buscar</button>
+            </form>
+            <p className="mt-4 flex items-center gap-2 text-xs text-white/55"><Icon className="size-4" name="location" />Ubicaciones aproximadas · nunca mostramos direcciones públicas</p>
+          </div>
 
-      <section id="inicio" className="relative mx-auto grid max-w-7xl gap-12 px-5 pb-20 pt-10 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:px-12 lg:pb-28 lg:pt-16">
-        <div className="relative z-10">
-          <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.16em] text-coral-dark">
-            <span className="size-2 rounded-full bg-coral" aria-hidden="true" />
-            Plataforma en preparación
-          </p>
-          <h1 className="max-w-4xl text-balance text-5xl font-black leading-[0.96] tracking-[-0.055em] text-forest sm:text-7xl lg:text-[5.5rem]">
-            Lo que a ti te sobra, a alguien le <span className="relative whitespace-nowrap text-coral">sirve.</span>
-          </h1>
-          <p className="mt-8 max-w-2xl text-pretty text-lg leading-8 text-forest/70 sm:text-xl">
-            Un espacio para regalar artículos, conectar con personas de tu zona y alargar la vida de las cosas de forma simple y responsable.
-          </p>
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <a className="inline-flex min-h-12 items-center justify-center rounded-full bg-forest px-6 py-3 font-extrabold text-cream shadow-[0_10px_30px_rgba(23,58,49,0.18)] transition hover:-translate-y-0.5 hover:bg-forest-light focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest" href="#como-funciona">
-              Conoce la idea
-            </a>
-            <p className="px-2 text-sm font-medium text-forest/60">Aún no se reciben publicaciones ni reservas.</p>
+          <div className="relative mx-auto hidden w-full max-w-lg lg:block" aria-hidden="true">
+            <div className="relative ml-auto aspect-[4/3] w-[88%] overflow-hidden rounded-[2.25rem] border border-white/15 shadow-2xl">
+              <Image className="object-cover" src={demoArticles[0].image} alt="" fill loading="eager" sizes="40vw" />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/90 to-transparent p-7 pt-20"><span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-green-deep">GRATIS</span><p className="mt-3 text-xl font-extrabold">{demoArticles[0].title}</p><p className="mt-1 text-sm text-white/70">{demoArticles[0].commune}</p></div>
+            </div>
+            <div className="absolute -bottom-5 left-0 rounded-2xl bg-amber px-5 py-4 text-ink shadow-xl"><p className="text-xs font-bold uppercase tracking-wider">Impacto compartido</p><p className="mt-1 font-extrabold">Una cosa menos guardada</p></div>
           </div>
         </div>
+      </section>
 
-        <div aria-hidden="true" className="relative mx-auto aspect-square w-full max-w-md">
-          <div className="absolute inset-5 rotate-6 rounded-[3.5rem] bg-mint shadow-[0_30px_80px_rgba(23,58,49,0.16)]" />
-          <div className="absolute inset-10 -rotate-3 overflow-hidden rounded-[3rem] border-2 border-forest/10 bg-cream p-7">
-            <div className="flex items-center justify-between">
-              <span className="rounded-full bg-forest px-3 py-1 text-xs font-black uppercase tracking-wider text-cream">Nueva vida</span>
-              <span className="text-3xl">✦</span>
-            </div>
-            <div className="mt-10 grid place-items-center">
-              <div className="relative grid size-48 place-items-center rounded-[42%_58%_55%_45%] bg-coral/15 sm:size-56">
-                <span className="text-8xl drop-shadow-sm">🪴</span>
-                <span className="absolute -right-6 top-5 rotate-6 rounded-2xl bg-white px-3 py-2 text-sm font-black text-forest shadow-lg">Gratis</span>
-              </div>
-            </div>
-            <div className="mt-8 h-3 w-3/4 rounded-full bg-forest/15" />
-            <div className="mt-3 h-3 w-1/2 rounded-full bg-forest/10" />
-          </div>
-          <div className="absolute -bottom-2 -left-2 rounded-3xl bg-coral px-5 py-4 font-black text-white shadow-xl sm:-left-7">Hecho para Chile 🇨🇱</div>
+      <section className="order-3 page-container py-12 sm:py-16" aria-labelledby="categorias-title">
+        <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-extrabold uppercase tracking-[0.14em] text-green-deep">Explora a tu manera</p><h2 id="categorias-title" className="mt-2 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">Categorías</h2></div><Link className="hidden text-sm font-extrabold text-green-deep hover:underline sm:block" href="/explorar">Ver todo →</Link></div>
+        <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {categories.map((category) => <Link className="group rounded-card border border-ink/10 bg-white p-4 shadow-card transition hover:-translate-y-1 hover:border-green-deep/30 hover:shadow-card-hover sm:p-5" href={`/explorar?categoria=${category.label}`} key={category.label}><span className={`grid size-11 place-items-center rounded-2xl text-xl font-black ${category.tone}`}>{category.symbol}</span><span className="mt-5 flex items-center justify-between font-extrabold text-ink"><span>{category.label}</span><Icon className="size-4 text-muted transition group-hover:translate-x-1 group-hover:text-green-deep" name="arrow" /></span></Link>)}
         </div>
       </section>
 
-      <section aria-label="Principios de la plataforma" className="border-y border-forest/10 bg-white/45">
-        <div className="mx-auto grid max-w-7xl divide-y divide-forest/10 px-5 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-8 lg:px-12">
-          {principles.map(([label, description]) => (
-            <div className="flex items-center gap-4 py-7 sm:px-7 sm:first:pl-0" key={label}>
-              <strong className="text-xl font-black text-coral">{label}</strong>
-              <span className="max-w-48 text-sm leading-5 text-forest/65">{description}</span>
-            </div>
-          ))}
+      <section className="order-2 border-y border-ink/8 bg-white py-10 sm:py-14" aria-labelledby="recientes-title">
+        <div className="page-container">
+          <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-extrabold uppercase tracking-[0.14em] text-green-deep">Cerca de ti</p><h2 id="recientes-title" className="mt-2 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">Artículos recientes</h2><p className="mt-2 text-sm text-muted">Contenido ficticio para visualizar el piloto.</p></div><Link className="button button-secondary !hidden sm:!inline-flex" href="/explorar">Explorar todos <Icon className="size-4" name="arrow" /></Link></div>
+          <div className="mt-6 grid auto-cols-[82%] grid-flow-col gap-4 overflow-x-auto px-0.5 pb-4 snap-x snap-mandatory sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-4">{demoArticles.map((article, index) => <div className="snap-start" key={article.slug}><ArticleCard article={article} priority={index < 2} /></div>)}</div>
+          <Link className="button button-secondary mt-6 w-full sm:!hidden" href="/explorar">Explorar todos <Icon className="size-4" name="arrow" /></Link>
         </div>
       </section>
 
-      <section id="como-funciona" className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:px-12 lg:py-32">
-        <div className="max-w-2xl">
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-coral-dark">Una comunidad circular</p>
-          <h2 className="mt-4 text-balance text-4xl font-black tracking-[-0.04em] text-forest sm:text-6xl">Menos cosas guardadas. Más cosas aprovechadas.</h2>
-        </div>
-        <ol className="mt-14 grid gap-5 lg:grid-cols-3">
-          {steps.map((step) => (
-            <li className="group rounded-[2rem] border border-forest/10 bg-white/65 p-7 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_20px_50px_rgba(23,58,49,0.09)]" key={step.number}>
-              <div className="flex items-start justify-between">
-                <span className="font-mono text-sm font-bold text-coral">{step.number}</span>
-                <span className="grid size-9 place-items-center rounded-full bg-mint text-forest transition group-hover:rotate-12" aria-hidden="true">→</span>
-              </div>
-              <h3 className="mt-12 text-2xl font-black tracking-tight text-forest">{step.title}</h3>
-              <p className="mt-3 leading-7 text-forest/65">{step.description}</p>
-            </li>
-          ))}
-        </ol>
+      <section className="order-4 page-container py-16 sm:py-24" aria-labelledby="como-funciona-title">
+        <div className="grid gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20"><div><span className="grid size-12 place-items-center rounded-2xl bg-green-deep text-white"><Icon className="size-6" name="sparkle" /></span><h2 id="como-funciona-title" className="mt-5 text-3xl font-black tracking-[-0.035em] sm:text-4xl">Simple, local y con privacidad</h2><p className="mt-4 leading-7 text-muted">El artículo siempre es gratis. El servicio de conexión solo se considera después de que una solicitud sea aceptada.</p></div><ol className="grid gap-3">{steps.map(([number, title, description]) => <li className="flex gap-4 rounded-card border border-ink/10 bg-white p-5" key={number}><span className="grid size-9 shrink-0 place-items-center rounded-full bg-fresh/15 text-sm font-black text-green-deep">{number}</span><div><h3 className="font-extrabold">{title}</h3><p className="mt-1 text-sm leading-6 text-muted">{description}</p></div></li>)}</ol></div>
       </section>
 
-      <footer className="bg-forest px-5 py-10 text-cream sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-black">Eso Me Sirve <span className="font-normal text-cream/60">· identidad provisional</span></p>
-          <p className="text-sm text-cream/60">Base técnica EMS-000 · Sin operaciones reales habilitadas</p>
-        </div>
-      </footer>
+      <section className="order-5 page-container"><div className="relative overflow-hidden rounded-[2rem] bg-green-deep px-6 py-10 text-white sm:px-12 sm:py-14"><div className="absolute -right-16 -top-20 size-64 rounded-full bg-fresh/30 blur-2xl" aria-hidden="true" /><div className="relative max-w-2xl"><p className="text-sm font-extrabold uppercase tracking-[0.15em] text-white/70">¿Tienes algo que ya no usas?</p><h2 className="mt-3 text-3xl font-black tracking-[-0.035em] sm:text-5xl">Publicar siempre es gratis</h2><p className="mt-4 max-w-xl leading-7 text-white/75">Crea una publicación de demostración y conoce cómo se vería tu aporte a la comunidad.</p><Link className="button mt-7 bg-white text-green-deep hover:bg-surface" href="/publicar"><Icon className="size-5" name="plus" />Publicar un artículo</Link></div></div></section>
     </main>
   );
 }
