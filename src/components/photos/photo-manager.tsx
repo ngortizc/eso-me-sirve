@@ -12,7 +12,7 @@ import {
   type PhotoValidationError
 } from "@/components/photos/photo-selection";
 
-type ManagedPhoto = {
+export type ManagedPhoto = {
   id: string;
   file: File;
   previewUrl: string;
@@ -21,10 +21,11 @@ type ManagedPhoto = {
 
 type Props = {
   onCountChange?: (count: number) => void;
+  onPhotosChange?: (photos: readonly ManagedPhoto[]) => void;
   requirementMessage?: string;
 };
 
-export function PhotoManager({ onCountChange, requirementMessage }: Readonly<Props>) {
+export function PhotoManager({ onCountChange, onPhotosChange, requirementMessage }: Readonly<Props>) {
   const galleryInputId = useId();
   const cameraInputId = useId();
   const [photos, setPhotos] = useState<ManagedPhoto[]>([]);
@@ -34,7 +35,8 @@ export function PhotoManager({ onCountChange, requirementMessage }: Readonly<Pro
   useEffect(() => {
     photosRef.current = photos;
     onCountChange?.(photos.length);
-  }, [onCountChange, photos]);
+    onPhotosChange?.(photos);
+  }, [onCountChange, onPhotosChange, photos]);
 
   useEffect(() => () => {
     for (const photo of photosRef.current) URL.revokeObjectURL(photo.previewUrl);
@@ -117,7 +119,7 @@ export function PhotoManager({ onCountChange, requirementMessage }: Readonly<Pro
           ))}
         </ol>
       )}
-      <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted"><Icon className="mt-0.5 size-4 shrink-0 text-green-deep" name="lock" />Las fotografías permanecen solo en la memoria de este navegador. Revisa que no muestren teléfonos, direcciones ni otros datos personales.</p>
+      <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted"><Icon className="mt-0.5 size-4 shrink-0 text-green-deep" name="lock" />Al guardar, el servidor verificará y volverá a codificar las imágenes, eliminando EXIF y GPS. Revisa igualmente que los píxeles no muestren teléfonos, direcciones ni otros datos personales.</p>
     </section>
   );
 }

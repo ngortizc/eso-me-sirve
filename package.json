@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:e2e": "node --env-file-if-exists=.env scripts/run-e2e.mjs",
     "mailbox:latest": "node --env-file-if-exists=.env scripts/read-dev-mailbox.mjs",
@@ -27,7 +28,8 @@
     "next": "16.4.0",
     "pg": "8.23.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",

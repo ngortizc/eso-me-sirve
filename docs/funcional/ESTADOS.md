@@ -1,8 +1,21 @@
-# Estados funcionales propuestos — a validar en EMS-005/006
+# Estados funcionales
+
+## Publicaciones implementadas en EMS-003
+
+Los estados persistidos en EMS-003 son `DRAFT`, `PUBLISHED`, `PAUSED` y `REMOVED`.
+
+- `DRAFT → PUBLISHED | REMOVED`
+- `PUBLISHED → PAUSED | REMOVED`
+- `PAUSED → PUBLISHED | REMOVED`
+- `REMOVED` es terminal.
+
+Solo `PUBLISHED` aparece en catálogo y detalle públicos. Publicar o reactivar exige título, descripción, categoría, condición, región, comuna y entre una y ocho fotografías, con exactamente una principal. La base de datos valida estas invariantes y bloquea transiciones no permitidas. Editar contenido no cambia el estado por sí solo.
+
+## Estados futuros propuestos — a validar en EMS-005/006
 
 Modelar estados separados para evitar confundir disponibilidad, cobro, derecho a contacto y entrega.
 
-**Listing:** `DRAFT`, `PUBLISHED`, `RESERVED`, `GIVEN_AWAY`, `PAUSED`, `REMOVED`.
+Los futuros `RESERVED` y `GIVEN_AWAY` no se implementan en EMS-003: dependen de las reglas de solicitud, reserva y entrega.
 
 **Reservation:** `REQUESTED`, `ACCEPTED_AWAITING_PAYMENT`, `CONTACT_UNLOCKED`, `HANDOFF_CONFIRMED`, `REJECTED`, `EXPIRED`, `CANCELLED`, `DISPUTED`. Se recomienda separar formalmente contacto del estado de reserva mediante `ContactGrant`; nombres son provisionales.
 

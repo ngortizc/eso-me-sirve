@@ -11,29 +11,25 @@ test("presenta la propuesta y navega hacia el catálogo", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Eso Me Sirve/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Dale una nueva vida");
-  await expect(page.getByText("Datos de demostración").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Explorar todos/i }).first()).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "es-CL");
   await page.getByRole("link", { name: /Explorar todos/i }).first().click();
   await expect(page).toHaveURL(/\/explorar/);
 });
 
 test("filtra el catálogo localmente y ofrece un estado vacío", async ({ page }) => {
-  await page.goto("/explorar");
-  await expect(page.getByTestId("catalog-grid").getByRole("article")).toHaveCount(4);
-  await page.getByTestId("catalog-search").fill("sillón");
-  await expect(page.getByTestId("catalog-grid").getByRole("article")).toHaveCount(1);
-  await expect(page.getByText("Sillón verde de un cuerpo")).toBeVisible();
-  await page.getByTestId("category-filter").selectOption("Infantil");
+  await page.goto("/explorar?q=termino-que-no-existe-ems");
+  await expect(page.getByTestId("catalog-search")).toHaveValue("termino-que-no-existe-ems");
   await expect(page.getByTestId("empty-state")).toBeVisible();
-  await page.getByRole("button", { name: "Ver todos los artículos" }).click();
-  await expect(page.getByTestId("catalog-grid").getByRole("article")).toHaveCount(4);
+  await page.getByRole("link", { name: "Limpiar" }).click();
+  await expect(page).toHaveURL(/\/explorar$/);
 });
 
 test("explica el detalle sin revelar contacto", async ({ page }) => {
   await registerVerifiedUser(page, "detalle");
   await page.goto("/articulos/sillon-verde");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sillón verde de un cuerpo");
-  await expect(page.getByText("La dirección nunca es pública.")).toBeVisible();
+  await expect(page.getByText(/La dirección y los datos de contacto nunca son públicos/i)).toBeVisible();
   await page.getByRole("button", { name: "Solicitar artículo" }).click();
   await expect(page.getByText(/no se envió ninguna solicitud/)).toBeVisible();
   await expect(page.getByRole("link", { name: /Ver proceso de conexión/ })).toBeVisible();
@@ -86,16 +82,12 @@ test("hidrata publicar sin atributos inyectados ni divergencias React", async ({
   expect(hydrationMessages).toEqual([]);
 });
 
-test("el formulario de publicación no persiste datos", async ({ page }) => {
+test("el formulario real no permite establecer precio", async ({ page }) => {
   await registerVerifiedUser(page, "formulario");
   await page.goto("/publicar");
-  await page.getByTestId("gallery-photo-input").setInputFiles(photoFile(1));
-  await page.getByLabel("Título").fill("Mesa auxiliar de prueba");
-  await page.getByLabel("Descripción").fill("Descripción ficticia suficientemente clara para la demostración.");
-  await page.getByLabel("Categoría").selectOption("Hogar");
-  await page.getByLabel("Comuna").selectOption("Ñuñoa");
-  await page.getByRole("button", { name: "Revisar publicación" }).click();
-  await expect(page.getByText(/no se guardó ni publicó información/)).toBeVisible();
+  await expect(page.getByLabel(/precio/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Publicar artículo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Guardar borrador" })).toBeVisible();
 });
 
 test("distingue artículo gratis, tarifa referencial y pago deshabilitado", async ({ page }) => {

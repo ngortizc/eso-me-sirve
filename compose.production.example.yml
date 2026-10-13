@@ -28,12 +28,15 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Inject BETTER_AUTH_SECRET from a secret store}
       BETTER_AUTH_URL: https://${APP_DOMAIN:?Define APP_DOMAIN outside Git}
       APP_ENV: production
+      PHOTO_STORAGE_ROOT: /app/storage/listings
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 3s
       retries: 3
     networks: [frontend, backend]
+    volumes:
+      - listing_photos:/app/storage/listings
 
   db:
     image: postgres:18.3-alpine3.23
@@ -50,6 +53,7 @@ volumes:
   caddy_data:
   caddy_config:
   postgres_data:
+  listing_photos:
 
 networks:
   frontend:

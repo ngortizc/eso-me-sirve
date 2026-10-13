@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: process.env.E2E_BUILD === "1" ? undefined : "standalone",
   devIndicators: false,
   poweredByHeader: false,
   reactStrictMode: true,

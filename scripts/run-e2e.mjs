@@ -3,17 +3,28 @@ import process from "node:process";
 
 const port = 3100;
 const isWindows = process.platform === "win32";
+const runtimeEnvironment = {
+  ...process.env,
+  NEXT_TELEMETRY_DISABLED: "1",
+  BETTER_AUTH_URL: `http://127.0.0.1:${port}`,
+  APP_ENV: "development",
+  EMAIL_DELIVERY_MODE: "database",
+  E2E_BUILD: "1",
+  PHOTO_STORAGE_ROOT: ".data/listing-photos"
+};
+
+const build = spawnSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], {
+  env: runtimeEnvironment,
+  stdio: "inherit",
+  windowsHide: true
+});
+if (build.status !== 0) process.exit(build.status ?? 1);
+
 const server = spawn(
   process.execPath,
-  ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)],
+  ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)],
   {
-    env: {
-      ...process.env,
-      NEXT_TELEMETRY_DISABLED: "1",
-      BETTER_AUTH_URL: `http://127.0.0.1:${port}`,
-      APP_ENV: "development",
-      EMAIL_DELIVERY_MODE: "database"
-    },
+    env: runtimeEnvironment,
     stdio: "inherit",
     windowsHide: true,
     detached: !isWindows

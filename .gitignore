@@ -8,6 +8,7 @@ coverage/
 playwright-report/
 test-results/
 evidencias/
+.data/
 *.tsbuildinfo
 *.log
 .DS_Store

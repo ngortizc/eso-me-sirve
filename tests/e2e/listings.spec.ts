@@ -1,0 +1,157 @@
+import { expect, test, type Page } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import sharp from "sharp";
+import { registerVerifiedUser, signIn, testPassword, uniqueEmail } from "./auth-helpers";
+
+const demoPhotos = ["sillon-verde.png", "sillon-verde-lateral.png", "sillon-verde-detalle.png"].map((name) => join(process.cwd(), "public", "demo", "articles", name));
+const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+
+function uniqueTitle(prefix: string) { return `${prefix} ${crypto.randomUUID().slice(0, 6)}`; }
+
+async function publishFromUi(page: Page, title: string, photoPaths = [demoPhotos[0]!]) {
+  await page.goto("/publicar");
+  await page.getByTestId("gallery-photo-input").setInputFiles(photoPaths);
+  await page.getByLabel("Título").fill(title);
+  await page.getByLabel("Descripción").fill("Artículo gratuito en buen estado para retirar coordinando dentro de la comuna seleccionada.");
+  await page.getByLabel("Categoría").selectOption("hogar");
+  await page.getByLabel("Condición").selectOption("GOOD");
+  await page.getByLabel("Región").selectOption("CL-RM");
+  await page.getByLabel("Comuna").selectOption("13120");
+  await page.getByRole("button", { name: "Publicar artículo" }).click();
+  await expect(page).toHaveURL(/\/articulos\/[^?]+\?created=1$/);
+  return new URL(page.url()).pathname.split("/").pop()!;
+}
+
+async function publishFromApi(page: Page, title: string) {
+  const response = await page.request.post("/api/listings", {
+    multipart: {
+      intent: "publish", title,
+      description: "Artículo gratuito en buen estado para validar autorización del propietario en el servidor.",
+      categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", primaryPhotoIndex: "0",
+      photos: { name: "foto.png", mimeType: "image/png", buffer: tinyPng }
+    }
+  });
+  expect(response.status()).toBe(201);
+  return (await response.json() as { listing: { id: string; slug: string } }).listing;
+}
+
+test("publica, persiste tras cerrar sesión, filtra y oculta al pausar", async ({ page }) => {
+  const account = await registerVerifiedUser(page, "listing-flow");
+  const title = uniqueTitle("Lámpara persistente");
+  const slug = await publishFromUi(page, title);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+  await page.request.post("/api/auth/sign-out");
+  await page.goto(`/articulos/${slug}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+
+  await page.goto(`/explorar?q=${encodeURIComponent(title)}&category=hogar&region=CL-RM&commune=13120`);
+  await expect(page.getByTestId("catalog-grid").getByRole("article")).toHaveCount(1);
+  await expect(page.getByText(title)).toBeVisible();
+
+  await signIn(page, account.email, testPassword);
+  await page.goto("/mis-cosas");
+  const card = page.getByTestId("owner-listing").filter({ hasText: title });
+  await card.getByRole("button", { name: "Pausar" }).click();
+  await expect(card.getByText("Pausado")).toBeVisible();
+  await page.goto(`/articulos/${slug}`);
+  await expect(page.getByRole("heading", { name: "Esta página no está disponible." })).toBeVisible();
+  await page.goto(`/explorar?q=${encodeURIComponent(title)}`);
+  await expect(page.getByTestId("empty-state")).toBeVisible();
+});
+
+test("deniega la edición de una publicación ajena", async ({ page }) => {
+  await registerVerifiedUser(page, "listing-owner");
+  const title = uniqueTitle("Silla protegida");
+  const listing = await publishFromApi(page, title);
+  await page.request.post("/api/auth/sign-out");
+  await page.context().clearCookies();
+  await registerVerifiedUser(page, "listing-intruder");
+  const response = await page.request.patch(`/api/listings/${listing.id}`, {
+    data: { title, description: "Descripción completa que un usuario ajeno no debe poder modificar nunca.", categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", status: "PAUSED", version: 1, ownerId: "forged" }
+  });
+  expect(response.status()).toBe(400);
+  const withoutForgedOwner = await page.request.patch(`/api/listings/${listing.id}`, {
+    data: { title, description: "Descripción completa que un usuario ajeno no debe poder modificar nunca.", categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", status: "PAUSED", version: 1 }
+  });
+  expect(withoutForgedOwner.status()).toBe(403);
+});
+
+test("rechaza fotografías inválidas y limita la selección a ocho", async ({ page }) => {
+  await registerVerifiedUser(page, "listing-invalid-photo");
+  const response = await page.request.post("/api/listings", {
+    multipart: {
+      intent: "publish", title: uniqueTitle("Archivo inválido"),
+      description: "Descripción completa para probar que el contenido binario se valida en el servidor.",
+      categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", primaryPhotoIndex: "0",
+      photos: { name: "falsa.png", mimeType: "image/png", buffer: Buffer.from("esto no es una imagen") }
+    }
+  });
+  expect(response.status()).toBe(400);
+  await page.goto("/publicar");
+  await page.getByTestId("gallery-photo-input").setInputFiles(Array.from({ length: 9 }, (_, index) => ({ name: `foto-${index}.png`, mimeType: "image/png", buffer: tinyPng })));
+  await expect(page.getByTestId("selected-photo")).toHaveCount(8);
+  await expect(page.getByRole("region", { name: "Fotografías" }).getByRole("alert")).toContainText("hasta 8 fotografías");
+});
+
+test("cambia principal, elimina fotografías y entrega variantes sin EXIF", async ({ page }) => {
+  await registerVerifiedUser(page, "listing-photo-admin");
+  const title = uniqueTitle("Mueble con galería");
+  const slug = await publishFromUi(page, title, demoPhotos.slice(0, 2));
+  await page.goto("/mis-cosas");
+  await page.getByTestId("owner-listing").filter({ hasText: title }).getByRole("link", { name: "Editar" }).click();
+  const makePrimary = page.getByRole("button", { name: "Hacer principal" });
+  await expect(makePrimary).toHaveCount(2);
+  await makePrimary.nth(1).click();
+  await expect(page.getByText("Fotografías actualizadas.")).toBeVisible();
+  await page.getByRole("button", { name: "Eliminar" }).first().click();
+  await expect(page.getByRole("button", { name: "Eliminar" })).toHaveCount(1);
+
+  const catalogResponse = await page.request.get(`/api/listings?q=${encodeURIComponent(title)}`);
+  const catalog = await catalogResponse.json() as { items: Array<{ primaryPhotoUrl: string; slug: string }> };
+  expect(catalog.items[0]?.slug).toBe(slug);
+  const imageResponse = await page.request.get(catalog.items[0]!.primaryPhotoUrl.replace("/catalog", "/detail"));
+  expect(imageResponse.status()).toBe(200);
+  const metadata = await sharp(await imageResponse.body()).metadata();
+  expect(metadata.format).toBe("webp");
+  expect(metadata.exif).toBeUndefined();
+  expect(metadata.orientation).toBeUndefined();
+});
+
+test("un usuario no verificado no puede publicar", async ({ page }) => {
+  const email = uniqueEmail("listing-unverified");
+  const testClientIp = `192.0.2.${Math.floor(Math.random() * 250) + 1}`;
+  const signup = await page.request.post("/api/auth/sign-up/email", { headers: { "x-ems-test-client-ip": testClientIp }, data: { name: "Sin verificar", email, password: testPassword, callbackURL: "/perfil" } });
+  expect(signup.status()).toBe(200);
+  const response = await page.request.post("/api/listings", {
+    multipart: { intent: "draft", title: "Borrador no autorizado", primaryPhotoIndex: "0" }
+  });
+  expect([401, 403]).toContain(response.status());
+});
+
+test("las respuestas públicas omiten propietario, contacto y claves físicas", async ({ page }) => {
+  const account = await registerVerifiedUser(page, "listing-privacy");
+  const title = uniqueTitle("Objeto sin datos privados");
+  await publishFromApi(page, title);
+  const response = await page.request.get(`/api/listings?q=${encodeURIComponent(title)}`);
+  const text = await response.text();
+  expect(text).not.toContain(account.userId);
+  expect(text).not.toContain(account.email);
+  expect(text).not.toMatch(/storageKey|ownerId|phone|address|password|token/i);
+});
+
+test("captura publicación y catálogo reales", async ({ page }, testInfo) => {
+  await registerVerifiedUser(page, `listing-evidence-${testInfo.project.name}`);
+  const title = uniqueTitle("Escritorio comunitario");
+  const slug = await publishFromUi(page, title, demoPhotos.slice(0, 3));
+  const directory = join(process.cwd(), "evidencias", "EMS-003");
+  await mkdir(directory, { recursive: true });
+  for (const [name, route] of [["detalle", `/articulos/${slug}`], ["catalogo", `/explorar?q=${encodeURIComponent(title)}`], ["mis-publicaciones", "/mis-cosas"]] as const) {
+    await page.goto(route);
+    await page.locator("body").waitFor();
+    await page.screenshot({ path: join(directory, `${testInfo.project.name}-${name}.png`), fullPage: true, caret: "initial" });
+  }
+});

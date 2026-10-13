@@ -1,6 +1,6 @@
 # Eso Me Sirve
 
-Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-002 incorpora cuentas reales locales, verificación de correo, recuperación, sesiones y autorización. Publicaciones, solicitudes, reservas, pagos, contacto y entregas continúan como demostración sin persistencia.
+Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-003 incorpora publicaciones persistentes asociadas a cuentas verificadas, catálogo público y procesamiento seguro de fotografías. Solicitudes, reservas, pagos, contacto y entregas continúan fuera de alcance.
 
 ## Requisitos
 
@@ -21,6 +21,7 @@ Aplicación web responsive/PWA para dar una nueva vida a artículos que otras pe
 | PostgreSQL | 18.3-alpine3.23 |
 | `pg` / `node-pg-migrate` | 8.23.1 / 9.0.0 |
 | Better Auth | 1.7.7 |
+| Sharp | 0.35.5 |
 | Vitest / Playwright | 5.0.4 / 1.64.0 |
 
 ## Configuración local
@@ -64,7 +65,9 @@ npm run mailbox:latest -- persona@example.cl EMAIL_VERIFICATION
 
 El buzón contiene enlaces secretos: úsalo solo en desarrollo, no publiques su salida y no lo habilites en producción. El registro productivo permanece deshabilitado hasta aprobar e implementar un proveedor de correo.
 
-El prototipo incluye `/explorar`, detalles en `/articulos/[slug]`, `/publicar`, `/mis-cosas` y `/conexion`. Los controles interactivos son locales y las acciones dejan claro que no persisten datos ni ejecutan transacciones. En `/publicar`, las fotografías seleccionadas permanecen solo en memoria y sus previsualizaciones se liberan al eliminarlas o abandonar la vista.
+`/explorar` y `/articulos/[slug]` muestran publicaciones públicas reales. Una cuenta verificada puede crear borradores o publicar desde `/publicar`, y administrar sus publicaciones y fotografías desde `/mis-cosas`. Las solicitudes y `/conexion` siguen explicando el flujo futuro sin guardar reservas ni ejecutar transacciones.
+
+Las previsualizaciones de `/publicar` usan Object URLs temporales y los liberan al eliminar la foto o desmontar el componente. Al enviar, el servidor detecta el contenido binario, limita dimensiones, rota y recodifica a WebP sin EXIF/GPS, y conserva únicamente variantes de catálogo y detalle bajo `PHOTO_STORAGE_ROOT`. Nunca se sirve la ruta del almacenamiento ni el original recibido.
 
 ## Comandos
 
@@ -74,7 +77,8 @@ El prototipo incluye `/explorar`, detalles en `/articulos/[slug]`, `/publicar`, 
 | `npm run typecheck` | TypeScript estricto sin emitir archivos |
 | `npm run lint` | ESLint con reglas Next.js/Core Web Vitals |
 | `npm run test` | Pruebas unitarias Vitest |
-| `npm run test:e2e` | E2E móvil/escritorio, identidad, health/PWA y capturas en `evidencias/EMS-001.1` y `evidencias/EMS-002` |
+| `npm run test:integration` | Integración de publicaciones con PostgreSQL real |
+| `npm run test:e2e` | E2E móvil/escritorio, identidad, publicaciones, fotografías y capturas ignoradas por Git |
 | `npm run mailbox:latest -- correo tipo` | Lee explícitamente el último correo local de identidad |
 | `npm run build` | Compilación standalone de producción |
 | `npm run db:migrate` | Migraciones SQL pendientes hacia arriba |
@@ -85,7 +89,7 @@ Antes del primer E2E instala Chromium una vez con `npx playwright install chromi
 ## Arquitectura
 
 - `src/app`: App Router, interfaz y adaptadores HTTP.
-- `src/modules`: límites modulares; identidad y perfiles mínimos están implementados, los demás dominios permanecen pendientes.
+- `src/modules`: límites modulares; identidad, perfiles y publicaciones separan dominio, aplicación e infraestructura.
 - `src/shared`: puertos y capacidades transversales mínimas; health y logging en EMS-000.
 - `db/migrations`: migraciones SQL ordenadas con `node-pg-migrate`. El ORM continúa pendiente.
 - `tests/e2e`: pruebas Playwright en viewport móvil y escritorio.
@@ -99,7 +103,7 @@ El manifiesto y service worker permiten instalación básica cuando el navegador
 
 ## Contenedores
 
-`compose.yml` publica PostgreSQL solo en `127.0.0.1`, conserva datos en un volumen y aísla la red backend. El contenedor Next.js es multi-stage, standalone y se ejecuta con el usuario no-root `node`.
+`compose.yml` publica PostgreSQL solo en `127.0.0.1`, conserva la base en un volumen y monta `./.data/listing-photos` como almacenamiento local persistente. El contenedor Next.js es multi-stage, standalone y se ejecuta con el usuario no-root `node`. El ejemplo productivo usa un volumen separado únicamente como referencia; Object Storage continúa pendiente.
 
 `compose.production.example.yml` y `deploy/Caddyfile.example` son una referencia de HTTPS con Caddy. No constituyen una configuración productiva aprobada: faltan secret store, backups/restauración, observabilidad, límites, DNS y revisión de seguridad.
 

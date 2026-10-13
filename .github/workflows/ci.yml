@@ -32,6 +32,7 @@ jobs:
       BETTER_AUTH_URL: http://127.0.0.1:3100
       APP_ENV: development
       EMAIL_DELIVERY_MODE: database
+      PHOTO_STORAGE_ROOT: .data/listing-photos
       CI: true
     steps:
       - name: Checkout
@@ -60,6 +61,9 @@ jobs:
 
       - name: Ejecutar pruebas unitarias
         run: npm run test
+
+      - name: Ejecutar pruebas de integración PostgreSQL
+        run: npm run test:integration
 
       - name: Compilar producción
         run: npm run build

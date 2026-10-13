@@ -7,6 +7,7 @@ import { getPostgresPool } from "@/shared/database/postgres";
 const fifteenMinutesInSeconds = 15 * 60;
 const sevenDaysInSeconds = 7 * 24 * 60 * 60;
 const emailDelivery = new DatabaseEmailDelivery();
+const useSecureCookies = process.env.NODE_ENV === "production" && process.env.APP_ENV !== "development";
 
 export const auth = betterAuth({
   appName: "Eso Me Sirve",
@@ -73,11 +74,11 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "ems",
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies,
     defaultCookieAttributes: {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecureCookies,
       path: "/"
     },
     ipAddress: process.env.APP_ENV === "development"

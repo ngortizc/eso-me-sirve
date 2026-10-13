@@ -15,3 +15,4 @@
 | ADR-011 | PENDIENTE | Vigencias, cancelaciones, reclamos, retención de datos | No codificar valores arbitrarios |
 | ADR-012 | PENDIENTE | Política de devolución detallada/legal Chile | Validar antes de cobros en producción |
 | ADR-013 | PENDIENTE | Proveedores de correo, object storage y pagos | No activar integraciones comerciales sin decisión separada |
+| ADR-014 | APROBADA | Puerto de fotografías + adaptador local persistente y Sharp 0.35.5 | Solo desarrollo/piloto local; el proveedor Object Storage continúa pendiente en ADR-013 |
