@@ -8,6 +8,12 @@ import { getListingRepository, isListingAccessError, ListingAccessError } from "
 
 type Context = { params: Promise<{ listingId: string }> };
 
+function accessResponse(error: ListingAccessError) {
+  if (error.reason === "FORBIDDEN") return NextResponse.json({ error: "No tienes permiso para modificar esta publicación." }, { status: 403 });
+  if (error.reason === "INVALID_STATE") return NextResponse.json({ error: "Las fotografías no se pueden modificar en el estado actual." }, { status: 409 });
+  return NextResponse.json({ error: "Publicación no encontrada." }, { status: 404 });
+}
+
 export async function POST(request: Request, { params }: Context) {
   const actor = await getCurrentUser(request.headers);
   if (!actor) return NextResponse.json({ error: "Debes iniciar sesión." }, { status: 401 });
@@ -36,7 +42,8 @@ export async function POST(request: Request, { params }: Context) {
       await repository.addOwnerPhotos(actor.id, listingId, stored.map((photo, index) => ({
         ...photo, id: randomUUID(), position: current.photos.length + index, isPrimary: false
       })), makePrimary ? 0 : null);
-      return NextResponse.json({ ok: true }, { status: 201 });
+      const listing = await repository.getOwnerListing(actor.id, listingId);
+      return NextResponse.json({ listing }, { status: 201 });
     } catch (error) {
       for (const photo of stored) {
         try { await storage.delete(photo.storageKey); }
@@ -46,9 +53,28 @@ export async function POST(request: Request, { params }: Context) {
     }
   } catch (error) {
     if (error instanceof ListingPhotoProcessingError) return NextResponse.json({ error: error.message }, { status: 400 });
-    if (isListingAccessError(error)) {
-      return NextResponse.json({ error: error.reason === "FORBIDDEN" ? "No tienes permiso para modificar esta publicación." : "Publicación no encontrada." }, { status: error.reason === "FORBIDDEN" ? 403 : 404 });
-    }
+    if (isListingAccessError(error)) return accessResponse(error);
     return NextResponse.json({ error: "No fue posible agregar las fotografías." }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request, { params }: Context) {
+  const actor = await getCurrentUser(request.headers);
+  if (!actor) return NextResponse.json({ error: "Debes iniciar sesión." }, { status: 401 });
+  if (!actor.emailVerified) return NextResponse.json({ error: "Verifica tu correo antes de modificar fotografías." }, { status: 403 });
+  const { listingId } = await params;
+  try {
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body) || !("orderedPhotoIds" in body) ||
+        !Array.isArray(body.orderedPhotoIds) || body.orderedPhotoIds.some((id) => typeof id !== "string")) {
+      return NextResponse.json({ error: "El orden de fotografías no es válido." }, { status: 400 });
+    }
+    const repository = getListingRepository();
+    await repository.reorderOwnerPhotos(actor.id, listingId, body.orderedPhotoIds);
+    const listing = await repository.getOwnerListing(actor.id, listingId);
+    return NextResponse.json({ listing });
+  } catch (error) {
+    if (isListingAccessError(error)) return accessResponse(error);
+    return NextResponse.json({ error: "No fue posible reordenar las fotografías." }, { status: 500 });
   }
 }

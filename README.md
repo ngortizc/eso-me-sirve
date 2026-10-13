@@ -1,6 +1,6 @@
 # Eso Me Sirve
 
-Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-003 incorpora publicaciones persistentes asociadas a cuentas verificadas, catálogo público y procesamiento seguro de fotografías. Solicitudes, reservas, pagos, contacto y entregas continúan fuera de alcance.
+Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-004 incorpora solicitudes persistentes, aceptación transaccional, reservas con 24 horas exactas para pagar y expiración idempotente. Pagos, contacto y entregas continúan fuera de alcance.
 
 ## Requisitos
 
@@ -65,7 +65,25 @@ npm run mailbox:latest -- persona@example.cl EMAIL_VERIFICATION
 
 El buzón contiene enlaces secretos: úsalo solo en desarrollo, no publiques su salida y no lo habilites en producción. El registro productivo permanece deshabilitado hasta aprobar e implementar un proveedor de correo.
 
-`/explorar` y `/articulos/[slug]` muestran publicaciones públicas reales. Una cuenta verificada puede crear borradores o publicar desde `/publicar`, y administrar sus publicaciones y fotografías desde `/mis-cosas`. Las solicitudes y `/conexion` siguen explicando el flujo futuro sin guardar reservas ni ejecutar transacciones.
+`/explorar` y `/articulos/[slug]` muestran publicaciones públicas reales. Una cuenta verificada puede publicar, solicitar un artículo ajeno y administrar publicaciones, solicitudes y reservas desde `/mis-cosas`. Al aceptar una solicitud se crea una reserva `PENDING_PAYMENT`; el pago permanece deshabilitado y no se muestran datos de contacto.
+
+La administración separa guardar contenido, gestionar fotografías y retirar. Las fotos se pueden agregar, reordenar, reemplazar, marcar como principal y eliminar; una publicación visible conserva al menos una. El retiro pide confirmación, se audita, es terminal y se bloquea durante una reserva activa.
+
+`/mis-cosas` organiza publicaciones, solicitudes enviadas y recibidas en pestañas con contadores reales. «Pendiente de ti» destaca solicitudes por aceptar/rechazar y reservas propias pendientes de pago. La reserva se presenta según el participante autenticado: el publicador ve que está esperando el pago del receptor, su alias público y el plazo, sin tarifa ni acción de pago; el receptor seleccionado ve el artículo gratis, la tarifa de conexión, el vencimiento exacto en horario de Chile y el tiempo informativo restante. El pago continúa deshabilitado.
+
+El propietario elige entre solicitudes elegibles sin prioridad automática. Al aceptar una, las demás permanecen pendientes «En espera» durante la reserva y vuelven a ser elegibles si esta vence o se cancela. El publicador ve únicamente el nombre público o alias; correo, teléfono, dirección y datos internos siguen privados. Para probar A, B y C simultáneamente usa perfiles o contextos de navegador separados: varias pestañas de una misma ventana de incógnito comparten la misma cookie de sesión.
+
+### Usuarios sintéticos para pruebas locales
+
+Con la base local migrada, ejecuta:
+
+```powershell
+npm run dev:seed-users
+```
+
+El comando solo funciona con `APP_ENV=development`, base y autenticación en loopback. Crea o regenera Publicador A, Receptor B y Receptor C mediante Better Auth, todos verificados y con rol `USER`. No imprime contraseñas: las guarda en `.data/dev-seed-users.json`, archivo ignorado por Git y restringido al usuario local. Repetir el comando rota las contraseñas sin duplicar cuentas e invalida sus sesiones anteriores. Nunca copies ese archivo a commits, CI, capturas o documentación.
+
+Los escenarios completos están en `docs/desarrollo/PRUEBAS_MANUALES_EMS-004.md`. El sembrador no inserta publicaciones ni solicitudes por SQL; deben crearse mediante la aplicación con datos ficticios para conservar validaciones y auditoría.
 
 Las previsualizaciones de `/publicar` usan Object URLs temporales y los liberan al eliminar la foto o desmontar el componente. Al enviar, el servidor detecta el contenido binario, limita dimensiones, rota y recodifica a WebP sin EXIF/GPS, y conserva únicamente variantes de catálogo y detalle bajo `PHOTO_STORAGE_ROOT`. Nunca se sirve la ruta del almacenamiento ni el original recibido.
 
@@ -82,6 +100,8 @@ Las previsualizaciones de `/publicar` usan Object URLs temporales y los liberan 
 | `npm run mailbox:latest -- correo tipo` | Lee explícitamente el último correo local de identidad |
 | `npm run build` | Compilación standalone de producción |
 | `npm run db:migrate` | Migraciones SQL pendientes hacia arriba |
+| `npm run reservations:expire` | Worker idempotente que vence reservas y libera publicaciones |
+| `npm run dev:seed-users` | Crea o rota tres usuarios sintéticos exclusivamente en desarrollo local |
 | `docker compose --profile app up --build` | Aplicación y DB en contenedores locales |
 
 Antes del primer E2E instala Chromium una vez con `npx playwright install chromium`. Las pruebas E2E requieren PostgreSQL arriba, migraciones aplicadas y `DATABASE_URL` cargada desde `.env`.
@@ -89,7 +109,7 @@ Antes del primer E2E instala Chromium una vez con `npx playwright install chromi
 ## Arquitectura
 
 - `src/app`: App Router, interfaz y adaptadores HTTP.
-- `src/modules`: límites modulares; identidad, perfiles y publicaciones separan dominio, aplicación e infraestructura.
+- `src/modules`: límites modulares; identidad, perfiles, publicaciones y reservas separan dominio, aplicación e infraestructura.
 - `src/shared`: puertos y capacidades transversales mínimas; health y logging en EMS-000.
 - `db/migrations`: migraciones SQL ordenadas con `node-pg-migrate`. El ORM continúa pendiente.
 - `tests/e2e`: pruebas Playwright en viewport móvil y escritorio.
@@ -103,7 +123,7 @@ El manifiesto y service worker permiten instalación básica cuando el navegador
 
 ## Contenedores
 
-`compose.yml` publica PostgreSQL solo en `127.0.0.1`, conserva la base en un volumen y monta `./.data/listing-photos` como almacenamiento local persistente. El contenedor Next.js es multi-stage, standalone y se ejecuta con el usuario no-root `node`. El ejemplo productivo usa un volumen separado únicamente como referencia; Object Storage continúa pendiente.
+`compose.yml` publica PostgreSQL solo en `127.0.0.1`, conserva la base en un volumen y monta `./.data/listing-photos` como almacenamiento local persistente. El perfil `app` inicia Next.js y un worker de reservas separado que consulta vencimientos cada minuto. Ambos contenedores usan etapas multi-stage y usuarios no-root. El ejemplo productivo usa un volumen separado únicamente como referencia; Object Storage continúa pendiente.
 
 `compose.production.example.yml` y `deploy/Caddyfile.example` son una referencia de HTTPS con Caddy. No constituyen una configuración productiva aprobada: faltan secret store, backups/restauración, observabilidad, límites, DNS y revisión de seguridad.
 
@@ -113,10 +133,11 @@ El manifiesto y service worker permiten instalación básica cuando el navegador
 - Puerto 5432 ocupado: cambia `POSTGRES_PORT` y el puerto en `DATABASE_URL`.
 - Docker en Windows no responde: inicia Docker Desktop y confirma WSL2 con `wsl -l -v`.
 - Playwright no encuentra navegador: ejecuta `npx playwright install chromium` (en Linux CI se usa `--with-deps`).
+- Better Auth no puede derivar una IP por conexión al servir el build directamente sin proxy: la advertencia y el bucket compartido son el comportamiento seguro esperado. En producción mantén Next.js privado detrás de Caddy; no confíes globalmente en `X-Forwarded-For` para ocultar la advertencia.
 - Un volumen conserva credenciales antiguas: no lo borres sin respaldar; crea una base/volumen nuevo o coordina una rotación segura.
 
 ## Decisiones y alcance
 
-Las reglas aprobadas están en `docs/negocio/REGLAS_NEGOCIO.md`; las decisiones abiertas, en `docs/arquitectura/DECISIONES.md`. La tarifa de CLP 1.000 es una hipótesis de piloto. Pago confirmado habilita contacto después de aceptación, no equivale a entrega; una devolución requiere incumplimiento acreditado del publicador.
+Las reglas aprobadas están en `docs/negocio/REGLAS_NEGOCIO.md`; las decisiones abiertas, en `docs/arquitectura/DECISIONES.md`. EMS-NEG-012 fija 24 horas exactas desde la aceptación hasta el vencimiento del pago. La tarifa de CLP 1.000 es una hipótesis de piloto. Pago confirmado habilita contacto después de aceptación, no equivale a entrega; una devolución requiere incumplimiento acreditado del publicador. ADR-018 define para EMS-005 que el publicador ingresará teléfono y dirección o punto de retiro privados al publicar, actualizables antes de habilitar el pago y visibles únicamente para el receptor seleccionado tras confirmación y autorización del servidor; ese almacenamiento y desbloqueo todavía no están implementados.
 
 `npm audit --omit=dev` no reporta vulnerabilidades de producción. La cadena de lint presenta una alerta alta de desarrollo en `braces` sin versión corregida publicada y ESLint 9 aparece fuera de soporte; la excepción y el criterio de actualización están registrados en ADR-0008.

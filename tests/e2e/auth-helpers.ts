@@ -44,13 +44,13 @@ export async function expireSessionsFor(email: string): Promise<void> {
   }
 }
 
-export async function registerVerifiedUser(page: Page, label: string) {
+export async function registerVerifiedUser(page: Page, label: string, name = "Persona de prueba") {
   const email = uniqueEmail(label);
   const testClientIp = `192.0.2.${Math.floor(Math.random() * 250) + 1}`;
   await page.setExtraHTTPHeaders({ "x-ems-test-client-ip": testClientIp });
   const signup = await page.request.post("/api/auth/sign-up/email", {
     headers: { "x-ems-test-client-ip": testClientIp },
-    data: { name: "Persona de prueba", email, password: testPassword, callbackURL: "/perfil" }
+    data: { name, email, password: testPassword, callbackURL: "/perfil" }
   });
   expect(signup.status()).toBe(200);
   await expect.poll(async () => Boolean(await latestEmail(email, "EMAIL_VERIFICATION"))).toBe(true);

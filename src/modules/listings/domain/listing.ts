@@ -1,4 +1,4 @@
-export const listingStatuses = ["DRAFT", "PUBLISHED", "PAUSED", "REMOVED"] as const;
+export const listingStatuses = ["DRAFT", "PUBLISHED", "PAUSED", "RESERVED", "REMOVED"] as const;
 export type ListingStatus = typeof listingStatuses[number];
 
 export const listingConditions = ["LIKE_NEW", "GOOD", "USED_FUNCTIONAL", "NEEDS_REPAIR"] as const;
@@ -8,6 +8,7 @@ export const listingStatusLabels: Record<ListingStatus, string> = {
   DRAFT: "Borrador",
   PUBLISHED: "Publicado",
   PAUSED: "Pausado",
+  RESERVED: "Reservado",
   REMOVED: "Retirado"
 };
 
@@ -22,6 +23,7 @@ const transitions: Record<ListingStatus, readonly ListingStatus[]> = {
   DRAFT: ["DRAFT", "PUBLISHED", "REMOVED"],
   PUBLISHED: ["PUBLISHED", "PAUSED", "REMOVED"],
   PAUSED: ["PAUSED", "PUBLISHED", "REMOVED"],
+  RESERVED: [],
   REMOVED: ["REMOVED"]
 };
 

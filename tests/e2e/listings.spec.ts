@@ -55,8 +55,12 @@ test("publica, persiste tras cerrar sesión, filtra y oculta al pausar", async (
   await signIn(page, account.email, testPassword);
   await page.goto("/mis-cosas");
   const card = page.getByTestId("owner-listing").filter({ hasText: title });
-  await card.getByRole("button", { name: "Pausar" }).click();
+  await expect(card.getByRole("link", { name: "Editar", exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Marcar como entregado · Próximamente" })).toBeDisabled();
+  await card.getByRole("button", { name: "Pausar publicación", exact: true }).click();
   await expect(card.getByText("Pausado")).toBeVisible();
+  await expect(card.getByRole("link", { name: "Editar", exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Reactivar publicación", exact: true })).toBeVisible();
   await page.goto(`/articulos/${slug}`);
   await expect(page.getByRole("heading", { name: "Esta página no está disponible." })).toBeVisible();
   await page.goto(`/explorar?q=${encodeURIComponent(title)}`);
@@ -106,7 +110,7 @@ test("cambia principal, elimina fotografías y entrega variantes sin EXIF", asyn
   const makePrimary = page.getByRole("button", { name: "Hacer principal" });
   await expect(makePrimary).toHaveCount(2);
   await makePrimary.nth(1).click();
-  await expect(page.getByText("Fotografías actualizadas.")).toBeVisible();
+  await expect(page.getByText("Fotografía principal actualizada correctamente.")).toBeVisible();
   await page.getByRole("button", { name: "Eliminar" }).first().click();
   await expect(page.getByRole("button", { name: "Eliminar" })).toHaveCount(1);
 
@@ -141,6 +145,99 @@ test("las respuestas públicas omiten propietario, contacto y claves físicas", 
   expect(text).not.toContain(account.userId);
   expect(text).not.toContain(account.email);
   expect(text).not.toMatch(/storageKey|ownerId|phone|address|password|token/i);
+});
+
+test("edita, administra fotografías y retira sin bloquear el formulario", async ({ page }, testInfo) => {
+  await registerVerifiedUser(page, `listing-editing-${testInfo.project.name}`);
+  const originalTitle = uniqueTitle("Estante ficticio editable");
+  const slug = await publishFromUi(page, originalTitle, demoPhotos.slice(0, 2));
+  await page.goto("/mis-cosas");
+  await page.getByTestId("owner-listing").filter({ hasText: originalTitle }).getByRole("link", { name: "Editar" }).click();
+
+  const changedTitle = uniqueTitle("Estante ficticio corregido");
+  const changedDescription = "Descripción actualizada y persistente para validar que el formulario se libera después de guardar.";
+  await page.getByLabel("Título").fill(changedTitle);
+  await page.getByLabel("Descripción").fill(changedDescription);
+  await page.route("**/api/listings/*", async (route) => route.fulfill({ status: 500, contentType: "text/plain", body: "fallo simulado" }), { times: 1 });
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page.getByText("El servidor respondió 500 sin un mensaje válido.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Guardar cambios" })).toBeEnabled();
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page.getByText("Cambios guardados correctamente.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Guardar cambios" })).toBeEnabled();
+  await page.reload();
+  await expect(page.getByLabel("Título")).toHaveValue(changedTitle);
+  await expect(page.getByLabel("Descripción")).toHaveValue(changedDescription);
+
+  await page.getByRole("button", { name: "Hacer principal" }).nth(1).click();
+  await expect(page.getByText("Fotografía principal actualizada correctamente.")).toBeVisible();
+
+  await page.getByLabel("Nuevas fotografías").setInputFiles(demoPhotos[2]!);
+  await page.getByRole("button", { name: "Agregar fotografías" }).click();
+  await expect(page.getByText("Fotografías agregadas correctamente.")).toBeVisible();
+  await expect(page.getByTestId("managed-photo")).toHaveCount(3);
+
+  await page.getByRole("button", { name: "Mover fotografía 3 a la izquierda" }).click();
+  await expect(page.getByText("Orden de fotografías guardado correctamente.")).toBeVisible();
+
+  const firstPhoto = page.getByTestId("managed-photo").first();
+  const oldPhotoUrl = await firstPhoto.getByRole("img").getAttribute("src");
+  expect(oldPhotoUrl).toBeTruthy();
+  await page.getByLabel("Reemplazar fotografía 1").setInputFiles(demoPhotos[2]!);
+  await expect(page.getByText("Fotografía reemplazada correctamente.")).toBeVisible();
+  await expect(firstPhoto.getByRole("img")).not.toHaveAttribute("src", oldPhotoUrl!);
+  expect((await page.request.get(oldPhotoUrl!)).status()).toBe(404);
+
+  await page.getByTestId("managed-photo").last().getByRole("button", { name: "Eliminar" }).click();
+  await expect(page.getByText("Fotografía eliminada correctamente.")).toBeVisible();
+  await expect(page.getByTestId("managed-photo")).toHaveCount(2);
+  const evidenceDirectory = join(process.cwd(), "evidencias", "EMS-004.1");
+  await mkdir(evidenceDirectory, { recursive: true });
+  await page.screenshot({ path: join(evidenceDirectory, `${testInfo.project.name}-gestion-fotografias.png`), fullPage: true, caret: "initial" });
+
+  await page.getByRole("button", { name: "Retirar definitivamente", exact: true }).click();
+  await expect(page.getByText("Confirma el retiro definitivo")).toBeVisible();
+  await expect(page.getByText("Esta acción es irreversible.")).toBeVisible();
+  await page.getByRole("button", { name: "Sí, retirar definitivamente" }).click();
+  await expect(page.getByText("Publicación retirada correctamente.")).toBeVisible();
+  await expect(page.getByText("Esta publicación fue retirada definitivamente y no puede modificarse")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Guardar cambios" })).toHaveCount(0);
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByRole("combobox")).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Detalle de publicación retirada" })).toBeVisible();
+  await expect(page.getByText("Esta publicación fue retirada definitivamente y no puede modificarse")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Reactivar|Guardar|Retirar/ })).toHaveCount(0);
+  await page.screenshot({ path: join(evidenceDirectory, `${testInfo.project.name}-publicacion-retirada.png`), fullPage: true, caret: "initial" });
+
+  await page.goto("/mis-cosas");
+  const removedCard = page.getByTestId("owner-listing").filter({ hasText: changedTitle });
+  await expect(removedCard.getByRole("link", { name: "Editar", exact: true })).toHaveCount(0);
+  await expect(removedCard.getByRole("link", { name: "Ver detalle", exact: true })).toBeVisible();
+  await expect(removedCard.getByRole("button", { name: /Reactivar|Retirar|Pausar/ })).toHaveCount(0);
+  await removedCard.getByRole("link", { name: "Ver detalle", exact: true }).click();
+  await expect(page.getByText("Esta publicación fue retirada definitivamente y no puede modificarse")).toBeVisible();
+
+  await page.goto(`/articulos/${slug}`);
+  await expect(page.getByRole("heading", { name: "Esta página no está disponible." })).toBeVisible();
+  await page.goto(`/explorar?q=${encodeURIComponent(changedTitle)}`);
+  await expect(page.getByTestId("empty-state")).toBeVisible();
+});
+
+test("rechaza publicar un borrador sin fotografías", async ({ page }) => {
+  await registerVerifiedUser(page, "listing-without-photo");
+  const title = uniqueTitle("Borrador sin fotografía");
+  const draft = await page.request.post("/api/listings", {
+    multipart: { intent: "draft", title, description: "Borrador ficticio completo que deliberadamente no contiene ninguna fotografía.", categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", primaryPhotoIndex: "0" }
+  });
+  expect(draft.status()).toBe(201);
+  const listing = (await draft.json() as { listing: { id: string } }).listing;
+  const publish = await page.request.patch(`/api/listings/${listing.id}`, {
+    data: { title, description: "Borrador ficticio completo que deliberadamente no contiene ninguna fotografía.", categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", status: "PUBLISHED", version: 1 }
+  });
+  expect(publish.status()).toBe(400);
+  await expect(publish.json()).resolves.toMatchObject({ error: "Revisa los datos ingresados." });
 });
 
 test("captura publicación y catálogo reales", async ({ page }, testInfo) => {

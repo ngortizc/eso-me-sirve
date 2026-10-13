@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { PoolClient, QueryResultRow } from "pg";
 import { listingConditionLabels, canTransitionListing, type ListingCondition, type ListingStatus } from "@/modules/listings/domain/listing";
 import type {
@@ -220,6 +221,14 @@ export class PostgresListingRepository implements ListingRepository {
     return { ...publicSummary(row), description: row.description, photos: photos.rows.map(photoView) };
   }
 
+  async getOwnedPublishedListingIdBySlug(ownerId: string, slug: string): Promise<string | null> {
+    const result = await getPostgresPool().query<{ id: string }>(
+      "select id from listing where public_slug=$1 and owner_id=$2 and status='PUBLISHED'",
+      [slug, ownerId]
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
   async getOwnerListings(ownerId: string): Promise<OwnerListing[]> {
     const listings = await getPostgresPool().query<OwnerRow>(
       `select l.id, l.public_slug as slug, l.title, l.description, l.status, l.condition,
@@ -263,6 +272,13 @@ export class PostgresListingRepository implements ListingRepository {
         [listingId, ownerId, fields.title, fields.description, fields.categorySlug, fields.condition, nextStatus, expectedVersion]
       );
       if (updated.rowCount !== 1) throw new ListingAccessError("INVALID_STATE");
+      if (current.status !== nextStatus) {
+        await client.query(
+          `insert into reservation_event (entity_type, entity_id, action, previous_state, new_state, actor_kind, actor_id, correlation_id)
+           values ('LISTING', $1, 'OWNER_STATUS_CHANGED', $2, $3, 'USER', $4, $5)`,
+          [listingId, current.status, nextStatus, ownerId, randomUUID()]
+        );
+      }
       if (fields.regionCode && fields.communeCode) {
         await client.query(
           `insert into listing_public_location (listing_id, region_code, commune_code) values ($1,$2,$3)
@@ -271,6 +287,33 @@ export class PostgresListingRepository implements ListingRepository {
         );
       } else {
         await client.query("delete from listing_public_location where listing_id=$1", [listingId]);
+      }
+    });
+    const updated = await this.getOwnerListing(ownerId, listingId);
+    if (!updated) throw new ListingAccessError("NOT_FOUND");
+    return updated;
+  }
+
+  async retireOwnerListing(ownerId: string, listingId: string, expectedVersion: number): Promise<OwnerListing> {
+    await withTransaction(async (client) => {
+      const locked = await client.query<{ owner_id: string; status: ListingStatus; version: number }>(
+        "select owner_id, status, version from listing where id=$1 for update", [listingId]
+      );
+      const current = locked.rows[0];
+      if (!current) throw new ListingAccessError("NOT_FOUND");
+      if (current.owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
+      if (current.status === "RESERVED" || !canTransitionListing(current.status, "REMOVED")) throw new ListingAccessError("INVALID_STATE");
+      const updated = await client.query(
+        "update listing set status='REMOVED' where id=$1 and owner_id=$2 and version=$3",
+        [listingId, ownerId, expectedVersion]
+      );
+      if (updated.rowCount !== 1) throw new ListingAccessError("INVALID_STATE");
+      if (current.status !== "REMOVED") {
+        await client.query(
+          `insert into reservation_event (entity_type, entity_id, action, previous_state, new_state, actor_kind, actor_id, correlation_id)
+           values ('LISTING', $1, 'OWNER_REMOVED_LISTING', $2, 'REMOVED', 'USER', $3, $4)`,
+          [listingId, current.status, ownerId, randomUUID()]
+        );
       }
     });
     const updated = await this.getOwnerListing(ownerId, listingId);
@@ -293,6 +336,7 @@ export class PostgresListingRepository implements ListingRepository {
       const listing = listingResult.rows[0];
       if (!listing) throw new ListingAccessError("NOT_FOUND");
       if (listing.owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
+      if (listing.status === "RESERVED") throw new ListingAccessError("INVALID_STATE");
       const photos = await client.query<{ id: string; storage_key: string; position: number; is_primary: boolean }>(
         "select id, storage_key, position, is_primary from listing_photo where listing_id=$1 order by position for update", [listingId]
       );
@@ -314,13 +358,69 @@ export class PostgresListingRepository implements ListingRepository {
 
   async setOwnerPrimaryPhoto(ownerId: string, listingId: string, photoId: string): Promise<void> {
     await withTransaction(async (client) => {
-      const listing = await client.query<{ owner_id: string }>("select owner_id from listing where id=$1 for update", [listingId]);
+      const listing = await client.query<{ owner_id: string; status: ListingStatus }>("select owner_id, status from listing where id=$1 for update", [listingId]);
       if (!listing.rows[0]) throw new ListingAccessError("NOT_FOUND");
       if (listing.rows[0].owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
-      const updated = await client.query("update listing_photo set is_primary=(id=$2) where listing_id=$1", [listingId, photoId]);
-      if ((updated.rowCount ?? 0) === 0) throw new ListingAccessError("NOT_FOUND");
+      if (listing.rows[0].status === "RESERVED") throw new ListingAccessError("INVALID_STATE");
       const exists = await client.query("select 1 from listing_photo where listing_id=$1 and id=$2", [listingId, photoId]);
       if (!exists.rows[0]) throw new ListingAccessError("NOT_FOUND");
+      await client.query("update listing_photo set is_primary=false where listing_id=$1 and is_primary", [listingId]);
+      await client.query("update listing_photo set is_primary=true where listing_id=$1 and id=$2", [listingId, photoId]);
+    });
+  }
+
+  async reorderOwnerPhotos(ownerId: string, listingId: string, orderedPhotoIds: string[]): Promise<void> {
+    await withTransaction(async (client) => {
+      await client.query("set constraints listing_photo_position_unique deferred");
+      const listing = await client.query<{ owner_id: string; status: ListingStatus }>("select owner_id, status from listing where id=$1 for update", [listingId]);
+      if (!listing.rows[0]) throw new ListingAccessError("NOT_FOUND");
+      if (listing.rows[0].owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
+      if (listing.rows[0].status === "RESERVED") throw new ListingAccessError("INVALID_STATE");
+      const photos = await client.query<{ id: string }>("select id from listing_photo where listing_id=$1 order by position for update", [listingId]);
+      const existing = new Set(photos.rows.map((photo) => photo.id));
+      if (orderedPhotoIds.length !== existing.size || new Set(orderedPhotoIds).size !== existing.size || orderedPhotoIds.some((id) => !existing.has(id))) {
+        throw new ListingAccessError("INVALID_STATE");
+      }
+      for (const [position, photoId] of orderedPhotoIds.entries()) {
+        await client.query("update listing_photo set position=$3 where listing_id=$1 and id=$2", [listingId, photoId, position]);
+      }
+    });
+  }
+
+  async replaceOwnerPhoto(
+    ownerId: string,
+    listingId: string,
+    photoId: string,
+    replacement: CreateListingRecord["photos"][number]
+  ): Promise<string> {
+    return withTransaction(async (client) => {
+      await client.query("set constraints listing_photo_position_unique deferred");
+      const listing = await client.query<{ owner_id: string; status: ListingStatus }>("select owner_id, status from listing where id=$1 for update", [listingId]);
+      if (!listing.rows[0]) throw new ListingAccessError("NOT_FOUND");
+      if (listing.rows[0].owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
+      if (listing.rows[0].status === "RESERVED") throw new ListingAccessError("INVALID_STATE");
+      const selected = await client.query<{ storage_key: string; position: number; is_primary: boolean }>(
+        "select storage_key, position, is_primary from listing_photo where listing_id=$1 and id=$2 for update", [listingId, photoId]
+      );
+      const previous = selected.rows[0];
+      if (!previous) throw new ListingAccessError("NOT_FOUND");
+      await client.query("delete from listing_photo where id=$1", [photoId]);
+      await client.query(
+        `insert into listing_photo (
+          id, listing_id, storage_key, position, is_primary, media_type,
+          catalog_width, catalog_height, catalog_byte_size, detail_width, detail_height, detail_byte_size,
+          source_width, source_height, source_media_type, source_sha256, processing_version
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        [replacement.id, listingId, replacement.storageKey, previous.position, previous.is_primary, replacement.mediaType,
+          replacement.catalog.width, replacement.catalog.height, replacement.catalog.byteSize,
+          replacement.detail.width, replacement.detail.height, replacement.detail.byteSize,
+          replacement.sourceWidth, replacement.sourceHeight, replacement.sourceMediaType, replacement.sourceSha256, replacement.processingVersion]
+      );
+      await client.query(
+        "insert into listing_storage_cleanup (storage_key, reason) values ($1, 'photo-replaced') on conflict (storage_key) do update set completed_at=null, reason=excluded.reason",
+        [previous.storage_key]
+      );
+      return previous.storage_key;
     });
   }
 
@@ -331,9 +431,10 @@ export class PostgresListingRepository implements ListingRepository {
     makePrimaryIndex: number | null
   ): Promise<void> {
     await withTransaction(async (client) => {
-      const listing = await client.query<{ owner_id: string }>("select owner_id from listing where id=$1 for update", [listingId]);
+      const listing = await client.query<{ owner_id: string; status: ListingStatus }>("select owner_id, status from listing where id=$1 for update", [listingId]);
       if (!listing.rows[0]) throw new ListingAccessError("NOT_FOUND");
       if (listing.rows[0].owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
+      if (listing.rows[0].status === "RESERVED") throw new ListingAccessError("INVALID_STATE");
       const count = await client.query<{ total: string }>("select count(*) as total from listing_photo where listing_id=$1", [listingId]);
       const currentCount = Number(count.rows[0]?.total ?? 0);
       if (currentCount + photos.length > 8) throw new ListingAccessError("INVALID_STATE");
@@ -356,13 +457,15 @@ export class PostgresListingRepository implements ListingRepository {
   }
 
   async photoAccess(photoId: string, requesterId: string | null): Promise<{ storageKey: string; isPublic: boolean } | null> {
-    const result = await getPostgresPool().query<{ storage_key: string; status: ListingStatus; owner_id: string }>(
-      `select p.storage_key, l.status, l.owner_id from listing_photo p join listing l on l.id=p.listing_id where p.id=$1`, [photoId]
+    const result = await getPostgresPool().query<{ storage_key: string; status: ListingStatus; owner_id: string; reservation_recipient: boolean }>(
+      `select p.storage_key, l.status, l.owner_id,
+         exists(select 1 from reservation r where r.listing_id=l.id and r.recipient_id=$2) as reservation_recipient
+       from listing_photo p join listing l on l.id=p.listing_id where p.id=$1`, [photoId, requesterId]
     );
     const row = result.rows[0];
     if (!row) return null;
     const isPublic = row.status === "PUBLISHED";
-    if (!isPublic && requesterId !== row.owner_id) return null;
+    if (!isPublic && requesterId !== row.owner_id && !(row.status === "RESERVED" && row.reservation_recipient)) return null;
     return { storageKey: row.storage_key, isPublic };
   }
 

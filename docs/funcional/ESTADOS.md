@@ -1,23 +1,43 @@
 # Estados funcionales
 
-## Publicaciones implementadas en EMS-003
+## Publicaciones
 
-Los estados persistidos en EMS-003 son `DRAFT`, `PUBLISHED`, `PAUSED` y `REMOVED`.
+Los estados persistidos son `DRAFT`, `PUBLISHED`, `PAUSED`, `RESERVED` y `REMOVED`.
 
-- `DRAFT → PUBLISHED | REMOVED`
-- `PUBLISHED → PAUSED | REMOVED`
-- `PAUSED → PUBLISHED | REMOVED`
+- `DRAFT → PUBLISHED | REMOVED`.
+- `PUBLISHED → PAUSED | REMOVED` por decisión del propietario.
+- `PAUSED → PUBLISHED | REMOVED`.
+- `PUBLISHED → RESERVED` ocurre únicamente al aceptar una solicitud dentro de la transacción de reserva.
+- `RESERVED → PUBLISHED` ocurre únicamente al cancelar o vencer la reserva pendiente de pago.
 - `REMOVED` es terminal.
 
-Solo `PUBLISHED` aparece en catálogo y detalle públicos. Publicar o reactivar exige título, descripción, categoría, condición, región, comuna y entre una y ocho fotografías, con exactamente una principal. La base de datos valida estas invariantes y bloquea transiciones no permitidas. Editar contenido no cambia el estado por sí solo.
+Solo `PUBLISHED` aparece en catálogo y detalle públicos. Publicar o reactivar exige título, descripción, categoría, condición, región, comuna y entre una y ocho fotografías, con exactamente una principal. Una publicación `RESERVED` no se puede editar desde los casos de uso del propietario; esto evita inconsistencias con la liberación automática. `GIVEN_AWAY` continúa fuera de EMS-004.
 
-## Estados futuros propuestos — a validar en EMS-005/006
+`DRAFT`, `PAUSED` y `REMOVED` pueden persistir sin fotografías porque no son estados disponibles. `PUBLISHED` nunca puede quedar sin una; reemplazo, reordenamiento, principal y eliminación se validan bajo lock. `REMOVED` se ejecuta mediante una acción confirmada separada, conserva auditoría y sigue siendo terminal.
+
+## Solicitudes implementadas en EMS-004
+
+- `PENDING → ACCEPTED | REJECTED | CANCELLED`.
+- `ACCEPTED`, `REJECTED` y `CANCELLED` son terminales.
+- Una aceptación crea exactamente una reserva en la misma transacción. Las demás solicitudes conservan `PENDING`: la UI deriva `WAITING_RESERVATION` mientras la publicación esté `RESERVED`, sin introducir un estado persistido nuevo.
+- Al vencer o cancelar la reserva, la publicación vuelve a `PUBLISHED` y esas solicitudes pendientes vuelven a ser `ACTIONABLE`. El publicador elige; no hay prioridad por orden ni aceptación automática.
+- Una solicitud `REJECTED` o `CANCELLED` nunca se reactiva automáticamente.
+- Existe como máximo una solicitud `PENDING` por publicación y solicitante.
+
+## Reservas implementadas en EMS-004
+
+- La reserva nace en `PENDING_PAYMENT` al aceptar una solicitud.
+- `PENDING_PAYMENT → EXPIRED | CANCELLED`.
+- `EXPIRED` y `CANCELLED` son terminales y liberan la publicación si sigue `RESERVED`.
+- `accepted_at` y `payment_expires_at = accepted_at + 24 hours` usan `timestamptz` y hora PostgreSQL.
+- El worker y las operaciones críticas vencen con `payment_expires_at <= CURRENT_TIMESTAMP`, bloqueo transaccional e idempotencia.
+- No existe transición `PAID` en EMS-004. La cuenta regresiva del navegador es informativa y no autoriza acciones.
+
+La perspectiva visible no es un estado ni un parámetro aceptado del cliente. El servidor la deriva para cada reserva comparando la sesión autenticada con el receptor y el propietario persistidos. En `PENDING_PAYMENT`, el publicador ve «Esperando pago del receptor», el alias seleccionado y su fecha límite, sin tarifa, cronómetro ni CTA de pago. El receptor ve «Tu solicitud fue aceptada», artículo gratis, tarifa, fecha y cuenta regresiva informativa. Los eventos conservan sus códigos técnicos en PostgreSQL, pero la interfaz los traduce a descripciones en español.
+
+## Estados futuros propuestos — a validar desde EMS-005
 
 Modelar estados separados para evitar confundir disponibilidad, cobro, derecho a contacto y entrega.
-
-Los futuros `RESERVED` y `GIVEN_AWAY` no se implementan en EMS-003: dependen de las reglas de solicitud, reserva y entrega.
-
-**Reservation:** `REQUESTED`, `ACCEPTED_AWAITING_PAYMENT`, `CONTACT_UNLOCKED`, `HANDOFF_CONFIRMED`, `REJECTED`, `EXPIRED`, `CANCELLED`, `DISPUTED`. Se recomienda separar formalmente contacto del estado de reserva mediante `ContactGrant`; nombres son provisionales.
 
 **Payment:** `CREATED`, `PENDING`, `CONFIRMED`, `FAILED`, `CANCELLED`, `REFUND_PENDING`, `PARTIALLY_REFUNDED`, `REFUNDED` (si el proveedor lo permite). No inferir pago de la URL de retorno.
 
@@ -27,6 +47,6 @@ Los futuros `RESERVED` y `GIVEN_AWAY` no se implementan en EMS-003: dependen de 
 
 **ContactGrant:** `ACTIVE`, `SUSPENDED`, `REVOKED`, `EXPIRED` (vigencia por definir).
 
-**Concurrencia:** solo una reserva aceptada/vigente para un artículo. Bloqueo transaccional e índice parcial u otro mecanismo comprobado con pruebas de concurrencia.
+**Concurrencia:** solo una reserva aceptada/vigente para un artículo, protegida con bloqueo de fila, transacción e índice parcial único.
 
-**Temporalidad:** implementar expiraciones cuando se apruebe plazo; no inventar 24 horas como regla.
+**Temporalidad:** EMS-NEG-012 aprobó e implementó 24 horas exactas. Cualquier cambio exige una nueva decisión explícita y una migración versionada.

@@ -29,6 +29,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await getPostgresPool().query("delete from reservation_event where actor_id=any($1::text[])", [[ownerId, otherId]]);
   await getPostgresPool().query("delete from listing where id=$1", [listingId]);
   await getPostgresPool().query("delete from identity_user where id=any($1::text[])", [[ownerId, otherId]]);
 });

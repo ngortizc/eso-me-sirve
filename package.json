@@ -19,9 +19,11 @@
     "test:integration": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:e2e": "node --env-file-if-exists=.env scripts/run-e2e.mjs",
+    "dev:seed-users": "node --env-file-if-exists=.env --experimental-strip-types scripts/dev-seed-users.ts",
     "mailbox:latest": "node --env-file-if-exists=.env scripts/read-dev-mailbox.mjs",
     "db:migrate": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m db/migrations --migration-file-language sql up",
-    "db:migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m db/migrations --migration-file-language sql down"
+    "db:migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m db/migrations --migration-file-language sql down",
+    "reservations:expire": "node --env-file-if-exists=.env scripts/expire-reservations.mjs"
   },
   "dependencies": {
     "better-auth": "1.7.7",

@@ -1,5 +1,5 @@
-# Reglas de negocio v1.1 — Eso Me Sirve
-Fecha: 2026-10-12. Estado: **aprobado** salvo puntos indicados como pendientes.
+# Reglas de negocio v1.3 — Eso Me Sirve
+Fecha: 2026-10-13. Estado: **aprobado** salvo puntos indicados como pendientes.
 
 ## Definiciones aprobadas
 RN-01. El artículo publicado es siempre gratuito: precio del bien = CLP 0. No permitir publicar venta, permuta ni subasta.
@@ -14,10 +14,20 @@ RN-09. No liberar contacto con capturas de pantalla, redirects de checkout ni af
 RN-10. Cada pago, desbloqueo de contacto, reclamo, resolución y devolución deja un evento de auditoría minimizado y trazable.
 RN-11. La publicación puede dejar de estar disponible por retiro, eliminación, expiración o moderación. Acceso a contacto después de suspensión/cierre queda sujeto a política de privacidad y retención todavía pendiente; no perpetuar acceso indefinidamente.
 RN-12. No compartir datos de terceros sin autorización; consentimiento informado del publicador sobre quién y cuándo verá su contacto. Evitar teléfono y dirección en descripciones, fotos y metadata.
+RN-13. Mientras la publicación esté disponible pueden coexistir múltiples solicitudes. El publicador elige libremente una solicitud elegible: no existe prioridad por llegada ni gana quien intente pagar primero. Al aceptar, las demás solicitudes `PENDING` quedan en espera mientras exista la reserva activa y conservan su historial. Si la reserva vence o se cancela, vuelven a ser elegibles sin reactivar solicitudes `REJECTED` o `CANCELLED` y sin selección automática.
+RN-14. El nombre público o alias de la cuenta puede mostrarse al propietario de una publicación para distinguir interesados. Correo, teléfono, dirección, tokens e identificadores internos no forman parte de esa identidad pública ni de los DTO de solicitudes.
+RN-15. Para EMS-005, el publicador ingresará su teléfono y una dirección o punto de retiro al publicar el artículo. Estos datos serán privados y podrá actualizarlos antes de habilitar el pago. Solo el receptor seleccionado podrá consultarlos después de un pago confirmado por el servidor y de la autorización correspondiente. Esta decisión define el alcance futuro; EMS-004 no almacena ni desbloquea esos datos.
+
+## Decisión definitiva EMS-NEG-012 — ventana de pago
+
+EMS-NEG-012. Desde la aceptación del publicador, el receptor dispone de **24 horas exactas** para pagar el servicio de conexión. La aceptación y el vencimiento se registran en UTC usando la hora de PostgreSQL. Durante ese plazo existe una única reserva `PENDING_PAYMENT` y la publicación queda `RESERVED`. Al llegar exactamente a `payment_expires_at`, una operación crítica o el worker idempotente cambia la reserva a `EXPIRED`, libera la publicación y conserva el historial. Una operación tardía no puede reactivar la reserva vencida; para volver a participar se requiere una solicitud nueva.
+
+En EMS-004 todavía no existe pago real ni transición `PAID`. Mostrar una cuenta regresiva en el navegador es solo informativo y nunca determina la validez.
+
+La experiencia debe reflejar RN-02 y RN-03 sin ambigüedad: el publicador entrega gratuitamente y nunca recibe un CTA de pago; el receptor seleccionado es la única persona a quien corresponde la tarifa del servicio de conexión. La perspectiva se deriva de la sesión y los registros persistidos, no de parámetros del navegador. Antes de un pago confirmado, ninguna de las dos partes obtiene correo privado, teléfono ni dirección.
 
 ## Pendientes que bloquean funcionalidades concretas (NO codificar valores definitivos)
-P-01. Duración de reserva aceptada y ventana de pago; liberación y si se mantiene el orden de solicitantes.
-P-02. Cancelación anterior y posterior al pago, incluidas suspensiones por moderación.
+P-02. Cancelación posterior al pago e interacción con suspensiones por moderación. EMS-004 permite cancelar solicitudes pendientes y reservas aún no pagadas.
 P-03. Plazo para reclamar; qué constituye incumplimiento y medios de prueba aceptados.
 P-04. Plazo administrativo de resolución y apelación; quién asume comisiones de reembolso y si se devuelve el importe íntegro (preferencia provisional: importe íntegro, sujeto a validación jurídica/financiera).
 P-05. Proveedor y método de pago; comisiones reales, reversos, contracargos, liquidación e impuestos.

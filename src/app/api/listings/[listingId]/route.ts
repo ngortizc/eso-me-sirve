@@ -44,6 +44,9 @@ export async function PATCH(request: Request, { params }: Context) {
   if (["ownerId", "userId", "price", "salePrice", "amount"].some((key) => key in raw)) {
     return NextResponse.json({ error: "La solicitud contiene campos que no están permitidos." }, { status: 400 });
   }
+  if (raw.status === "REMOVED") {
+    return NextResponse.json({ error: "Usa la acción separada de retiro para retirar una publicación." }, { status: 400 });
+  }
 
   try {
     const repository = getListingRepository();

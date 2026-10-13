@@ -81,7 +81,9 @@ export const auth = betterAuth({
       secure: useSecureCookies,
       path: "/"
     },
-    ipAddress: process.env.APP_ENV === "development"
+    // Cabecera exclusiva del runner E2E. El desarrollo normal usa el fallback
+    // local de Better Auth; producción usa X-Forwarded-For emitido por Caddy.
+    ipAddress: process.env.APP_ENV === "development" && process.env.E2E_BUILD === "1"
       ? { ipAddressHeaders: ["x-ems-test-client-ip"] }
       : undefined,
     database: {

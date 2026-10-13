@@ -18,6 +18,14 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
+FROM toolchain AS reservation-worker
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node scripts/expire-reservations.mjs ./scripts/expire-reservations.mjs
+USER node
+CMD ["node", "scripts/expire-reservations.mjs", "--watch"]
+
 FROM node:24.14.0-alpine3.23 AS runner
 WORKDIR /app
 ENV NODE_ENV=production \

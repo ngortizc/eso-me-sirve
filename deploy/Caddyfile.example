@@ -1,6 +1,11 @@
 {$APP_DOMAIN} {
   encode zstd gzip
-  reverse_proxy app:3000
+  reverse_proxy app:3000 {
+    # Nunca reenviar la cabecera sintética que utiliza exclusivamente Playwright.
+    # Caddy genera X-Forwarded-For e ignora por defecto el valor entrante para
+    # evitar que un cliente suplante su IP. La aplicación no se publica directo.
+    header_up -X-EMS-Test-Client-IP
+  }
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"

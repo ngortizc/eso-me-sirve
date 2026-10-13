@@ -12,7 +12,11 @@
 | ADR-008 | APROBADA | Node 24 LTS/npm 11, Next 16, Tailwind 4, Vitest 5, Playwright 1.64 y Caddy 2.10 de referencia | Compatibilidad validada en EMS-000; ver ADR detallado |
 | ADR-009 | PENDIENTE | ORM y versión exactos | EMS-000 usa `pg` + migraciones SQL sin seleccionar ORM; Prisma sigue siendo candidato, no obligación |
 | ADR-010 | APROBADA | Better Auth 1.7.7 + PostgreSQL directo para identidad y sesiones | ADR detallado; correo local solo de pruebas, sin proveedor comercial |
-| ADR-011 | PENDIENTE | Vigencias, cancelaciones, reclamos, retención de datos | No codificar valores arbitrarios |
+| ADR-011 | PENDIENTE | Cancelaciones posteriores al pago, reclamos y retención de datos | La ventana previa al pago se resolvió en EMS-NEG-012/ADR-015 |
 | ADR-012 | PENDIENTE | Política de devolución detallada/legal Chile | Validar antes de cobros en producción |
 | ADR-013 | PENDIENTE | Proveedores de correo, object storage y pagos | No activar integraciones comerciales sin decisión separada |
 | ADR-014 | APROBADA | Puerto de fotografías + adaptador local persistente y Sharp 0.35.5 | Solo desarrollo/piloto local; el proveedor Object Storage continúa pendiente en ADR-013 |
+| ADR-015 | APROBADA | Reserva `PENDING_PAYMENT` por 24 horas exactas, hora PostgreSQL y expiración idempotente | EMS-NEG-012; sin pago ni contacto en EMS-004 |
+| ADR-016 | APROBADA | Reemplazo fotográfico con nuevo ID y limpieza compensable; IP solo desde proxy confiable | EMS-004.1; Caddy es el único ingreso productivo |
+| ADR-017 | APROBADA | Solicitudes no seleccionadas permanecen `PENDING` y su disponibilidad se deriva; nombre/alias es identidad pública mínima | EMS-004.3; sin prioridad, pago ni contacto |
+| ADR-018 | APROBADA | El publicador define contacto y dirección o punto de retiro privados al publicar; puede actualizarlos antes de habilitar el pago | EMS-005 almacenará y autorizará el acceso solo al receptor seleccionado tras pago confirmado; aún no implementado |

@@ -44,6 +44,22 @@ services:
     volumes:
       - ./.data/listing-photos:/app/storage/listings
 
+  reservation-worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: reservation-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Define POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:?Define POSTGRES_DB in .env}
+      RESERVATION_WORKER_POLL_MS: 60000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   postgres_data:
 
