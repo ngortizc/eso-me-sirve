@@ -10,7 +10,7 @@ Aceptar una solicitud debe reservar un único artículo durante 24 horas exactas
 
 ## Decisión
 
-La aceptación bloquea en una misma transacción PostgreSQL la solicitud y la publicación, crea una reserva `PENDING_PAYMENT`, fija `accepted_at = CURRENT_TIMESTAMP` y `payment_expires_at = accepted_at + interval '24 hours'`, cambia la publicación a `RESERVED`, rechaza otras solicitudes pendientes y escribe eventos correlacionados.
+La decisión original establecía que la aceptación bloquearía en una misma transacción PostgreSQL la solicitud y la publicación, crearía una reserva `PENDING_PAYMENT`, fijaría `accepted_at = CURRENT_TIMESTAMP` y `payment_expires_at = accepted_at + interval '24 hours'`, cambiaría la publicación a `RESERVED`, rechazaría otras solicitudes pendientes y escribiría eventos correlacionados. **La parte relativa al rechazo automático fue sustituida por ADR-0017 y RN-13:** la implementación vigente conserva las demás solicitudes `PENDING` en espera mientras la publicación está `RESERVED`.
 
 Un índice parcial único permite una sola reserva `PENDING_PAYMENT` por publicación. Otro índice parcial impide solicitudes `PENDING` duplicadas del mismo usuario. Triggers diferidos exigen correspondencia exacta entre solicitud `ACCEPTED` y reserva.
 

@@ -5,6 +5,7 @@ import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ListingTaxonomy, OwnerListing } from "@/modules/listings/application/listing-repository";
 import { listingConditionLabels, listingConditions, listingStatusLabels, type ListingStatus } from "@/modules/listings/domain/listing";
+import { PrivateContactSection } from "./private-contact-section";
 
 type ApiResult = { listing?: OwnerListing; error?: string; errors?: { message: string }[] };
 
@@ -150,7 +151,9 @@ export function ListingEditor({ listing, taxonomy }: Readonly<{ listing: OwnerLi
       </form>
     </section>
 
-    <section aria-labelledby="listing-photos-heading"><h2 className="text-2xl font-black" id="listing-photos-heading">2. Administrar fotografías</h2>
+    <PrivateContactSection listingId={current.id} mutationLocked={current.status === "RESERVED"} />
+
+    <section aria-labelledby="listing-photos-heading"><h2 className="text-2xl font-black" id="listing-photos-heading">3. Administrar fotografías</h2>
       <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_22rem]"><div className="rounded-card border border-ink/10 bg-white p-5">
         {current.photos.length === 0 && <p className="rounded-xl bg-surface-strong p-4 text-sm" data-testid="empty-photo-gallery">No hay fotografías persistidas. Una publicación sin fotografías no puede quedar publicada.</p>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{current.photos.map((photo, index) => <article className="overflow-hidden rounded-xl border border-ink/10" data-testid="managed-photo" key={photo.id}><div className="relative aspect-square bg-surface-strong"><Image src={photo.catalogUrl} alt={`Fotografía ${index + 1}`} fill unoptimized className="object-cover" />{photo.isPrimary && <span className="absolute left-2 top-2 rounded-full bg-green-deep px-2 py-1 text-[0.65rem] font-bold text-white">Principal</span>}</div><div className="grid gap-2 p-3">
@@ -163,7 +166,7 @@ export function ListingEditor({ listing, taxonomy }: Readonly<{ listing: OwnerLi
       </div>{photoMessage && <p className="mt-4 rounded-xl bg-surface-strong p-3 text-sm" role="status">{photoMessage}</p>}
     </section>
 
-    <section className="rounded-card border border-danger/25 bg-white p-5" aria-labelledby="listing-retire-heading"><h2 className="text-2xl font-black" id="listing-retire-heading">3. Retirar definitivamente</h2><p className="mt-2 text-sm text-muted">A diferencia de pausar, el retiro quita la publicación del catálogo, es irreversible y no está permitido mientras exista una reserva activa.</p><p className="mt-2 text-sm text-muted"><strong className="text-ink">Marcar como entregado</strong> será una acción distinta en una etapa futura; todavía no está disponible.</p>
+    <section className="rounded-card border border-danger/25 bg-white p-5" aria-labelledby="listing-retire-heading"><h2 className="text-2xl font-black" id="listing-retire-heading">4. Retirar definitivamente</h2><p className="mt-2 text-sm text-muted">A diferencia de pausar, el retiro quita la publicación del catálogo, es irreversible y no está permitido mientras exista una reserva activa.</p><p className="mt-2 text-sm text-muted"><strong className="text-ink">Marcar como entregado</strong> será una acción distinta en una etapa futura; todavía no está disponible.</p>
       {!editingDisabled && !confirmRetire && <button className="button button-secondary mt-4 border-danger text-danger" type="button" onClick={() => setConfirmRetire(true)}>Retirar definitivamente</button>}
       {confirmRetire && <div className="mt-4 rounded-xl border border-danger/30 bg-red-50 p-4" role="alert"><p className="font-black">Confirma el retiro definitivo</p><p className="mt-1 text-sm text-muted">La publicación dejará de estar disponible inmediatamente, no podrá editarse ni reactivarse. Esta acción es irreversible.</p><div className="mt-3 flex flex-wrap gap-2"><button className="button button-primary" type="button" disabled={retireBusy} onClick={retire}>{retireBusy ? "Retirando…" : "Sí, retirar definitivamente"}</button><button className="button button-secondary" type="button" disabled={retireBusy} onClick={() => setConfirmRetire(false)}>Cancelar</button></div></div>}
       {retireMessage && <p className="mt-4 rounded-xl bg-mint p-3 text-sm font-bold text-green-deep" role="status">{retireMessage}</p>}

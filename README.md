@@ -1,6 +1,6 @@
 # Eso Me Sirve
 
-Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-004 incorpora solicitudes persistentes, aceptación transaccional, reservas con 24 horas exactas para pagar y expiración idempotente. Pagos, contacto y entregas continúan fuera de alcance.
+Aplicación web responsive/PWA para dar una nueva vida a artículos que otras personas ya no usan. EMS-005A incorpora contacto privado cifrado por publicación, consentimiento y gestión exclusiva del propietario. Pagos, webhooks y desbloqueo del contacto continúan fuera de alcance.
 
 ## Requisitos
 
@@ -32,8 +32,9 @@ Linux/WSL2:
 
 ```bash
 cp .env.example .env
-# Cambia POSTGRES_PASSWORD y actualiza DATABASE_URL con el mismo valor.
+# Cambia POSTGRES_PASSWORD y actualiza DATABASE_URL.
 npm ci
+npm run dev:init-contact-key
 docker compose up -d db
 npm run db:migrate
 npm run dev
@@ -43,8 +44,9 @@ Windows PowerShell (Docker Desktop debe estar usando contenedores Linux):
 
 ```powershell
 Copy-Item .env.example .env
-# Cambia POSTGRES_PASSWORD y actualiza DATABASE_URL con el mismo valor.
+# Cambia POSTGRES_PASSWORD y actualiza DATABASE_URL.
 npm ci
+npm run dev:init-contact-key
 docker compose up -d db
 npm run db:migrate
 npm run dev
@@ -65,7 +67,9 @@ npm run mailbox:latest -- persona@example.cl EMAIL_VERIFICATION
 
 El buzón contiene enlaces secretos: úsalo solo en desarrollo, no publiques su salida y no lo habilites en producción. El registro productivo permanece deshabilitado hasta aprobar e implementar un proveedor de correo.
 
-`/explorar` y `/articulos/[slug]` muestran publicaciones públicas reales. Una cuenta verificada puede publicar, solicitar un artículo ajeno y administrar publicaciones, solicitudes y reservas desde `/mis-cosas`. Al aceptar una solicitud se crea una reserva `PENDING_PAYMENT`; el pago permanece deshabilitado y no se muestran datos de contacto.
+`/explorar` y `/articulos/[slug]` muestran publicaciones públicas reales. Una cuenta verificada puede publicar, solicitar un artículo ajeno y administrar publicaciones, solicitudes y reservas desde `/mis-cosas`. Para publicar debe aportar teléfono y lugar de retiro, que se cifran y solo puede consultar el propietario. Puede rectificarlos cuando no existe reserva activa; durante `PENDING_PAYMENT` se muestran en solo lectura. El pago permanece deshabilitado y nadie más obtiene el contacto.
+
+Ejecuta `npm run dev:init-contact-key` una vez antes de iniciar la aplicación. El comando genera una clave local de 32 bytes en `.data/secrets/private-contact-key-v1`, restringe sus permisos, no muestra su valor y no reemplaza una clave válida existente. Docker la monta como archivo secreto; el desarrollo directo usa `PRIVATE_CONTACT_KEY_V1_FILE` de `.env`. Reiniciar Docker conserva el descifrado porque el mismo archivo ignorado vuelve a montarse. Antes de producción se necesita secret store, respaldo cifrado y recuperación probada.
 
 La administración separa guardar contenido, gestionar fotografías y retirar. Las fotos se pueden agregar, reordenar, reemplazar, marcar como principal y eliminar; una publicación visible conserva al menos una. El retiro pide confirmación, se audita, es terminal y se bloquea durante una reserva activa.
 
@@ -97,6 +101,8 @@ Las previsualizaciones de `/publicar` usan Object URLs temporales y los liberan 
 | `npm run test` | Pruebas unitarias Vitest |
 | `npm run test:integration` | Integración de publicaciones con PostgreSQL real |
 | `npm run test:e2e` | E2E móvil/escritorio, identidad, publicaciones, fotografías y capturas ignoradas por Git |
+| `npm run test:docker-contact` | Verificación local con Chromium contra Docker: guardado, cifrado, reinicio, autorización y logs |
+| `npm run dev:init-contact-key` | Crea una clave local persistente e ignorada para cifrar contacto; nunca imprime su valor |
 | `npm run mailbox:latest -- correo tipo` | Lee explícitamente el último correo local de identidad |
 | `npm run build` | Compilación standalone de producción |
 | `npm run db:migrate` | Migraciones SQL pendientes hacia arriba |
@@ -104,18 +110,18 @@ Las previsualizaciones de `/publicar` usan Object URLs temporales y los liberan 
 | `npm run dev:seed-users` | Crea o rota tres usuarios sintéticos exclusivamente en desarrollo local |
 | `docker compose --profile app up --build` | Aplicación y DB en contenedores locales |
 
-Antes del primer E2E instala Chromium una vez con `npx playwright install chromium`. Las pruebas E2E requieren PostgreSQL arriba, migraciones aplicadas y `DATABASE_URL` cargada desde `.env`.
+Antes del primer E2E instala Chromium una vez con `npx playwright install chromium`. Las pruebas E2E requieren PostgreSQL arriba, migraciones aplicadas, `DATABASE_URL` cargada desde `.env` y `npm run dev:init-contact-key`. En local, runner y Docker comparten la misma clave por base de datos para no mezclar ciphertext con una misma versión lógica; CI usa una clave efímera junto con su PostgreSQL efímero. Ningún runner imprime la clave ni la usa la aplicación productiva.
 
 ## Arquitectura
 
 - `src/app`: App Router, interfaz y adaptadores HTTP.
-- `src/modules`: límites modulares; identidad, perfiles, publicaciones y reservas separan dominio, aplicación e infraestructura.
+- `src/modules`: límites modulares; identidad, perfiles, publicaciones, reservas y contacto privado separan dominio, aplicación e infraestructura.
 - `src/shared`: puertos y capacidades transversales mínimas; health y logging en EMS-000.
 - `db/migrations`: migraciones SQL ordenadas con `node-pg-migrate`. El ORM continúa pendiente.
 - `tests/e2e`: pruebas Playwright en viewport móvil y escritorio.
 - `deploy`: referencia Caddy/HTTPS, no un despliegue productivo.
 
-El dominio no importa Next.js, `pg`, persistencia ni APIs externas. Autorización y validación sensible ocurren en servidor. Ningún dato de teléfono o dirección exacta aparece en catálogo, HTML público, metadata, logs o respuestas no autorizadas.
+El dominio no importa Next.js, `pg`, persistencia ni APIs externas. Autorización y validación sensible ocurren en servidor. Ningún dato de teléfono o dirección exacta aparece en catálogo, HTML público, metadata, logs o respuestas no autorizadas. El endpoint `/api/listings/[listingId]/private-contact` usa la sesión del servidor, responde sin caché y no acepta roles ni propietarios enviados por el navegador.
 
 ## PWA y caché
 
@@ -134,10 +140,11 @@ El manifiesto y service worker permiten instalación básica cuando el navegador
 - Docker en Windows no responde: inicia Docker Desktop y confirma WSL2 con `wsl -l -v`.
 - Playwright no encuentra navegador: ejecuta `npx playwright install chromium` (en Linux CI se usa `--with-deps`).
 - Better Auth no puede derivar una IP por conexión al servir el build directamente sin proxy: la advertencia y el bucket compartido son el comportamiento seguro esperado. En producción mantén Next.js privado detrás de Caddy; no confíes globalmente en `X-Forwarded-For` para ocultar la advertencia.
+- Contacto privado responde que la configuración segura no está disponible: ejecuta `npm run dev:init-contact-key` y recrea `app` con `docker compose --profile app up -d --build app`. Si la base ya contiene contacto no sintético cifrado, recupera la clave original; generar otra no puede descifrar ciphertext existente.
 - Un volumen conserva credenciales antiguas: no lo borres sin respaldar; crea una base/volumen nuevo o coordina una rotación segura.
 
 ## Decisiones y alcance
 
-Las reglas aprobadas están en `docs/negocio/REGLAS_NEGOCIO.md`; las decisiones abiertas, en `docs/arquitectura/DECISIONES.md`. EMS-NEG-012 fija 24 horas exactas desde la aceptación hasta el vencimiento del pago. La tarifa de CLP 1.000 es una hipótesis de piloto. Pago confirmado habilita contacto después de aceptación, no equivale a entrega; una devolución requiere incumplimiento acreditado del publicador. ADR-018 define para EMS-005 que el publicador ingresará teléfono y dirección o punto de retiro privados al publicar, actualizables antes de habilitar el pago y visibles únicamente para el receptor seleccionado tras confirmación y autorización del servidor; ese almacenamiento y desbloqueo todavía no están implementados.
+Las reglas aprobadas están en `docs/negocio/REGLAS_NEGOCIO.md`; las decisiones abiertas, en `docs/arquitectura/DECISIONES.md`. EMS-NEG-012 fija 24 horas exactas desde la aceptación hasta el vencimiento del pago. La tarifa de CLP 1.000 es una hipótesis de piloto. Pago confirmado habilitará contacto después de aceptación, no equivale a entrega; una devolución requiere incumplimiento acreditado del publicador. ADR-018/019 y EMS-005A implementan el almacenamiento cifrado y la gestión del propietario. El acceso del receptor, pagos, webhooks y `ContactGrant` siguen expresamente sin implementar.
 
 `npm audit --omit=dev` no reporta vulnerabilidades de producción. La cadena de lint presenta una alerta alta de desarrollo en `braces` sin versión corregida publicada y ESLint 9 aparece fuera de soporte; la excepción y el criterio de actualización están registrados en ADR-0008.

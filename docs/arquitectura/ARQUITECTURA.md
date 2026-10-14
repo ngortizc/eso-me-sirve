@@ -32,6 +32,8 @@ La aceptación bloquea solicitud y publicación, crea una única reserva `PENDIN
 
 La sesión se resuelve por request desde Better Auth y PostgreSQL; no existe identidad global en proceso. Las páginas privadas leen `headers()` y por ello se renderizan dinámicamente en Next.js 16, mientras todos los endpoints `/api/*` envían `Cache-Control: no-store`. Una ventana de incógnito comparte cookies entre sus pestañas; usuarios simultáneos requieren perfiles o contextos de navegador separados.
 
+El contacto privado usa AES-256-GCM y claves versionadas externas. Docker local monta la clave desde `.data/secrets` como archivo secreto; producción deberá suministrarla mediante un secret store. Una reserva `PENDING_PAYMENT` congela la escritura del contacto tanto en el caso de uso transaccional como mediante trigger PostgreSQL, pero conserva la lectura del propietario. Cancelación o vencimiento libera nuevamente la edición; el snapshot posterior al pago queda pendiente para EMS-005C.
+
 El DTO privado de reserva deriva `PUBLISHER` o `RECIPIENT` en infraestructura al comparar el actor autenticado con las relaciones persistidas. No se acepta un rol o perspectiva enviado por URL o formulario. Solo la vista del publicador incluye el alias público minimizado del receptor; nunca incorpora correo, teléfono, dirección, tokens ni identificadores internos. La interfaz ramifica exclusivamente sobre esa perspectiva emitida por servidor. Los códigos de auditoría permanecen estables en PostgreSQL y se traducen mediante una capa de presentación, sin mutar el historial.
 
 ## Puntos abiertos

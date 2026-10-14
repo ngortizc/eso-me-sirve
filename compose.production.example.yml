@@ -29,6 +29,8 @@ services:
       BETTER_AUTH_URL: https://${APP_DOMAIN:?Define APP_DOMAIN outside Git}
       APP_ENV: production
       PHOTO_STORAGE_ROOT: /app/storage/listings
+      PRIVATE_CONTACT_ACTIVE_KEY_VERSION: ${PRIVATE_CONTACT_ACTIVE_KEY_VERSION:?Inject the active private-contact key version}
+      PRIVATE_CONTACT_KEY_V1_FILE: /run/secrets/private_contact_key_v1
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -37,6 +39,8 @@ services:
     networks: [frontend, backend]
     volumes:
       - listing_photos:/app/storage/listings
+    secrets:
+      - private_contact_key_v1
 
   db:
     image: postgres:18.3-alpine3.23
@@ -54,6 +58,10 @@ volumes:
   caddy_config:
   postgres_data:
   listing_photos:
+
+secrets:
+  private_contact_key_v1:
+    external: true
 
 networks:
   frontend:

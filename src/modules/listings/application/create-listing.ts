@@ -4,11 +4,13 @@ import type { ListingPhotoStorage, StoredListingPhoto } from "./ports/photo-stor
 import { MAX_LISTING_PHOTO_BYTES, MAX_LISTING_PHOTOS, validateListingFields, type ListingValidationError } from "../domain/listing-validation";
 
 export type CreateListingInput = {
+  id?: string;
   ownerId: string;
   intent: "draft" | "publish";
   fields: Record<string, unknown>;
   photos: Array<{ bytes: Uint8Array; declaredMediaType: string; originalFileName: string }>;
   primaryPhotoIndex: number;
+  privateContact?: import("@/modules/private-contact/application/private-contact-repository").EncryptedPrivateContact;
 };
 
 export class ListingInputError extends Error {
@@ -47,6 +49,9 @@ export class CreateListing {
 
     const publish = input.intent === "publish";
     const validation = validateListingFields(input.fields, { publish, photoCount: input.photos.length });
+    if (publish && !input.privateContact) {
+      validation.errors.push({ field: "privateContact", message: "Completa los datos privados de contacto y entrega antes de publicar." });
+    }
     if (validation.errors.length > 0) throw new ListingInputError(validation.errors);
     if (!(await this.repository.taxonomyIsValid(validation.value))) {
       throw new ListingInputError([{ field: "taxonomy", message: "La categoría o ubicación seleccionada no es válida." }]);
@@ -54,14 +59,16 @@ export class CreateListing {
     if (!(await this.repository.consumeUploadQuota(input.ownerId))) throw new ListingRateLimitError();
 
     const stored: StoredListingPhoto[] = [];
+    const listingId = input.id ?? randomUUID();
     try {
       for (const photo of input.photos) stored.push(await this.storage.store(photo));
       return await this.repository.create({
-        id: randomUUID(),
+        id: listingId,
         publicSlug: slugify(validation.value.title),
         ownerId: input.ownerId,
         status: publish ? "PUBLISHED" : "DRAFT",
         fields: validation.value,
+        privateContact: input.privateContact,
         photos: stored.map((photo, position) => ({
           ...photo,
           id: randomUUID(),

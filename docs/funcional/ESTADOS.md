@@ -11,7 +11,7 @@ Los estados persistidos son `DRAFT`, `PUBLISHED`, `PAUSED`, `RESERVED` y `REMOVE
 - `RESERVED → PUBLISHED` ocurre únicamente al cancelar o vencer la reserva pendiente de pago.
 - `REMOVED` es terminal.
 
-Solo `PUBLISHED` aparece en catálogo y detalle públicos. Publicar o reactivar exige título, descripción, categoría, condición, región, comuna y entre una y ocho fotografías, con exactamente una principal. Una publicación `RESERVED` no se puede editar desde los casos de uso del propietario; esto evita inconsistencias con la liberación automática. `GIVEN_AWAY` continúa fuera de EMS-004.
+Solo `PUBLISHED` aparece en catálogo y detalle públicos. Publicar o reactivar exige título, descripción, categoría, condición, región, comuna, datos privados de contacto y entrega con consentimiento, y entre una y ocho fotografías, con exactamente una principal. Una publicación `RESERVED` no se puede editar desde los casos de uso públicos del artículo; desde EMS-005A.1 el propietario puede consultar su contacto privado, pero no modificarlo mientras exista `PENDING_PAYMENT`. `GIVEN_AWAY` continúa fuera de alcance.
 
 `DRAFT`, `PAUSED` y `REMOVED` pueden persistir sin fotografías porque no son estados disponibles. `PUBLISHED` nunca puede quedar sin una; reemplazo, reordenamiento, principal y eliminación se validan bajo lock. `REMOVED` se ejecuta mediante una acción confirmada separada, conserva auditoría y sigue siendo terminal.
 
@@ -50,3 +50,7 @@ Modelar estados separados para evitar confundir disponibilidad, cobro, derecho a
 **Concurrencia:** solo una reserva aceptada/vigente para un artículo, protegida con bloqueo de fila, transacción e índice parcial único.
 
 **Temporalidad:** EMS-NEG-012 aprobó e implementó 24 horas exactas. Cualquier cambio exige una nueva decisión explícita y una migración versionada.
+
+## Preparación de contacto en EMS-005A
+
+La completitud del contacto privado no introduce un estado nuevo de publicación, reserva ni pago. Es una precondición persistida para `DRAFT → PUBLISHED`, `PAUSED → PUBLISHED` y `PUBLISHED → RESERVED`. Una publicación antigua sin contacto conserva su estado e historial, pero el servidor impide una nueva aceptación hasta que su propietario complete los datos. `ContactGrant` continúa siendo solo un contrato futuro: no existe concesión activa ni acceso del receptor en EMS-005A.

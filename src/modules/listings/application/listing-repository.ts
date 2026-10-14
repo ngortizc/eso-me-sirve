@@ -1,6 +1,7 @@
 import type { StoredListingPhoto } from "./ports/photo-storage";
 import type { ListingCondition, ListingStatus } from "../domain/listing";
 import type { ListingFields } from "../domain/listing-validation";
+import type { EncryptedPrivateContact } from "@/modules/private-contact/application/private-contact-repository";
 
 export type ListingTaxonomy = {
   categories: { slug: string; name: string }[];
@@ -15,6 +16,7 @@ export type CreateListingRecord = {
   status: "DRAFT" | "PUBLISHED";
   fields: ListingFields;
   photos: Array<StoredListingPhoto & { id: string; position: number; isPrimary: boolean }>;
+  privateContact?: EncryptedPrivateContact;
 };
 
 export type ListingPhotoView = {
@@ -59,6 +61,7 @@ export type OwnerListing = {
   communeCode: string | null;
   updatedAt: string;
   version: number;
+  privateContactComplete: boolean;
   photos: ListingPhotoView[];
 };
 

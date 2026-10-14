@@ -2,7 +2,7 @@
 
 - Estado: Aprobada
 - Fecha: 2026-10-13
-- Alcance de implementación: EMS-005
+- Alcance de implementación: almacenamiento y gestión en EMS-005A; desbloqueo posterior en EMS-005B o etapa aprobada equivalente
 
 ## Contexto
 
@@ -10,11 +10,11 @@ El receptor seleccionado necesita coordinar el retiro únicamente después de pa
 
 ## Decisión
 
-Al publicar un artículo, el publicador ingresará un teléfono y una dirección o punto de retiro. Ambos serán datos privados. El publicador podrá actualizarlos antes de habilitar el pago de la reserva.
+Al publicar un artículo, el publicador ingresará un teléfono y una dirección o punto de retiro. Ambos serán datos privados. El publicador podrá actualizarlos mientras no exista una reserva activa. ADR-0020 precisa y sustituye la interpretación anterior de «antes de habilitar el pago»: durante `PENDING_PAYMENT` el propietario puede consultar el contacto, pero no modificarlo.
 
 Solo el receptor seleccionado podrá acceder a esos datos después de que el servidor confirme el pago y autorice explícitamente la concesión de contacto correspondiente a esa reserva. La identidad pública o el estado `PENDING_PAYMENT` por sí solos no conceden acceso.
 
-Esta aprobación no implementa todavía campos, almacenamiento, endpoints, pagos ni desbloqueo. EMS-005 deberá definir cifrado o protección en reposo, auditoría minimizada, retención, revocación, consentimiento, contratos de API y validaciones de concurrencia antes de escribir código productivo.
+EMS-005A implementa campos, almacenamiento cifrado, consentimiento, endpoint privado del propietario, auditoría minimizada y control de concurrencia. No implementa pagos, webhooks, `ContactGrant` activo ni desbloqueo para receptores. El diseño criptográfico queda registrado en ADR-0019.
 
 ## Consecuencias
 

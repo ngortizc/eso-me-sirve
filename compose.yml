@@ -34,6 +34,8 @@ services:
       APP_ENV: development
       EMAIL_DELIVERY_MODE: database
       PHOTO_STORAGE_ROOT: /app/storage/listings
+      PRIVATE_CONTACT_ACTIVE_KEY_VERSION: ${PRIVATE_CONTACT_ACTIVE_KEY_VERSION:-1}
+      PRIVATE_CONTACT_KEY_V1_FILE: /run/secrets/private_contact_key_v1
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -43,6 +45,8 @@ services:
       - backend
     volumes:
       - ./.data/listing-photos:/app/storage/listings
+    secrets:
+      - private_contact_key_v1
 
   reservation-worker:
     profiles: ["app"]
@@ -62,6 +66,10 @@ services:
 
 volumes:
   postgres_data:
+
+secrets:
+  private_contact_key_v1:
+    file: ./.data/secrets/private-contact-key-v1
 
 networks:
   backend:

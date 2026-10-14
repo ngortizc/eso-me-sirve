@@ -42,7 +42,7 @@ export function RequestArticle({ listingSlug, returnTo }: Readonly<{ listingSlug
       <div className="flex items-center justify-between gap-4"><span className="font-bold">Servicio de conexión</span><strong>{formatClp(CONNECTION_SERVICE_FEE_CLP)}</strong></div>
     </div>
     <p className="mt-3 text-sm leading-6 text-muted">El artículo es gratis. Si aceptan tu solicitud, tendrás 24 horas para pagar {formatClp(CONNECTION_SERVICE_FEE_CLP).replace(" CLP", "")} por el servicio de conexión y obtener los datos de contacto.</p>
-    <p className="mt-2 text-xs leading-5 text-muted">El pago y los datos de contacto todavía no están habilitados en esta versión.</p>
+    <p className="mt-2 text-xs leading-5 text-muted">El pago y el acceso del receptor a los datos de contacto todavía no están habilitados en esta versión.</p>
     <button className="button button-primary mt-5 w-full" disabled={busy || created} type="button" onClick={submit}>
       {created ? "Solicitud enviada" : busy ? "Enviando…" : "Solicitar artículo"}
     </button>

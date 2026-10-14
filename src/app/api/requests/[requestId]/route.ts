@@ -10,6 +10,7 @@ function accessResponse(reason: ReservationAccessReason) {
   if (reason === "FORBIDDEN") return NextResponse.json({ error: "No tienes permiso para administrar esta solicitud." }, { status: 403 });
   if (reason === "NOT_FOUND") return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
   if (reason === "CONFLICT") return NextResponse.json({ error: "Otra solicitud ya reservó este artículo." }, { status: 409 });
+  if (reason === "CONTACT_REQUIRED") return NextResponse.json({ error: "Completa los datos privados de contacto y entrega antes de aceptar una solicitud." }, { status: 409 });
   return NextResponse.json({ error: "La operación no es válida para el estado actual." }, { status: 409 });
 }
 

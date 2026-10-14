@@ -12,7 +12,9 @@
 | EMS-004.2 | UX de Mis cosas, comunicación de reserva y usuarios sintéticos locales | EMS-004/004.1 | COMPLETADO 2026-10-13 |
 | EMS-004.3 | Autorización, aislamiento de sesiones y cierre funcional de reservas | EMS-004/004.1/004.2 | COMPLETADO 2026-10-13 |
 | EMS-004.4 | Separación de experiencia del publicador y del receptor | EMS-004/004.3 | COMPLETADO 2026-10-13 |
-| EMS-005 | Contacto privado al publicar, órdenes de pago, pasarela, conciliación y desbloqueo autorizado | EMS-004 + ADR-018 + proveedor + revisión legal | PENDIENTE |
+| EMS-005A | Contacto privado por publicación, cifrado, consentimiento y gestión exclusiva del propietario | EMS-004 + ADR-018/019 | COMPLETADO 2026-10-13 |
+| EMS-005A.1 | Provisión segura de clave en Docker y congelación de contacto durante reserva activa | EMS-005A + ADR-020 | COMPLETADO 2026-10-13 |
+| EMS-005B | Órdenes de pago, pasarela, conciliación y desbloqueo autorizado mediante `ContactGrant` | EMS-005A + proveedor + revisión legal | PENDIENTE |
 | EMS-006 | Entrega, reclamos y devoluciones | EMS-005 + política final | PENDIENTE |
 | EMS-007 | Administración y moderación operativa | anteriores | PENDIENTE |
 | EMS-008 | Exploración ampliada, pruebas integrales, hardening y piloto | anteriores | PENDIENTE |

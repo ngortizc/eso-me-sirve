@@ -11,6 +11,7 @@ async function publish(page: import("@playwright/test").Page, title: string) {
       intent: "publish", title,
       description: "Artículo gratuito para validar el flujo real y seguro de solicitudes y reservas.",
       categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", primaryPhotoIndex: "0",
+      contactPhone: "+56 9 8765 4321", deliveryMethod: "MEETING_POINT", deliveryLocation: "Punto ficticio para pruebas", contactConsent: "true",
       photos: { name: "foto.png", mimeType: "image/png", buffer: tinyPng }
     }
   });
@@ -46,6 +47,7 @@ test("solicita, acepta y muestra una reserva privada en escritorio y móvil", as
   await expect(page.getByText("Tu solicitud fue enviada. El publicador debe aceptarla antes de que corresponda pagar.")).toBeVisible();
   const duplicate = await page.request.post("/api/requests", { data: { listingSlug: listing.slug } });
   expect(duplicate.status()).toBe(409);
+  expect((await page.request.get(`/api/listings/${listing.id}/private-contact`)).status()).toBe(404);
   const recipientCookies = await page.context().cookies();
 
   await page.context().clearCookies();
@@ -82,8 +84,29 @@ test("solicita, acepta y muestra una reserva privada en escritorio y móvil", as
   expect(ownedBody.reservations[0]?.status).toBe("PENDING_PAYMENT");
   expect(new Date(ownedBody.reservations[0]!.paymentExpiresAt).getTime() - new Date(ownedBody.reservations[0]!.acceptedAt).getTime()).toBe(24 * 60 * 60 * 1000);
   const reservationId = ownedBody.reservations[0]!.id;
-
   await page.screenshot({ path: join(evidenceDir, `${testInfo.project.name}-solicitudes-recibidas.png`), fullPage: true, caret: "initial" });
+
+  await page.goto(`/mis-publicaciones/${listing.id}/editar`);
+  await expect(page.getByTestId("private-contact-reservation-lock")).toContainText("no modificar el teléfono ni el lugar de retiro");
+  await expect(page.getByTestId("private-contact-readonly")).toContainText("Punto ficticio para pruebas");
+  await expect(page.getByRole("button", { name: /Actualizar datos privados|Guardar datos privados/ })).toHaveCount(0);
+  const blockedContactUpdate = await page.request.put(`/api/listings/${listing.id}/private-contact`, {
+    data: {
+      version: 1,
+      contactPhone: "+56 9 1111 2222",
+      deliveryMethod: "MEETING_POINT",
+      deliveryLocation: "Punto ficticio que no debe persistir",
+      deliveryInstructions: "No registrar",
+      contactConsent: true
+    }
+  });
+  expect(blockedContactUpdate.status()).toBe(409);
+  await expect(blockedContactUpdate.json()).resolves.toMatchObject({ error: expect.stringContaining("reserva pendiente de pago") });
+  const ownerContactAfterBlockedUpdate = await page.request.get(`/api/listings/${listing.id}/private-contact`);
+  await expect(ownerContactAfterBlockedUpdate.json()).resolves.toMatchObject({ contact: { phone: "+56987654321", location: "Punto ficticio para pruebas", version: 1 } });
+  const ems5a1EvidenceDir = join(process.cwd(), "evidencias", "EMS-005A.1");
+  await mkdir(ems5a1EvidenceDir, { recursive: true });
+  await page.screenshot({ path: join(ems5a1EvidenceDir, `${testInfo.project.name}-contacto-reserva-solo-lectura.png`), fullPage: true, caret: "initial" });
 
   await page.goto(`/reservas/${reservationId}?perspective=RECIPIENT&role=RECIPIENT`);
   await expect(page.getByText("Esperando pago del receptor").first()).toBeVisible();
@@ -99,6 +122,7 @@ test("solicita, acepta y muestra una reserva privada en escritorio y móvil", as
 
   await page.context().clearCookies();
   await page.context().addCookies(recipientCookies);
+  expect((await page.request.get(`/api/listings/${listing.id}/private-contact?paid=true&role=owner`)).status()).toBe(404);
   await page.goto("/mis-cosas?tab=enviadas");
   expect((await page.request.get(ownedBody.reservations[0]!.primaryPhotoUrl)).status()).toBe(200);
   const recipientReservation = page.getByTestId("pending-reservation-action").filter({ hasText: title });

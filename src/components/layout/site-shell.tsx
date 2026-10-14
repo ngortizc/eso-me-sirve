@@ -25,7 +25,7 @@ export function SiteShell({ children }: Readonly<{ children: ReactNode }>) {
         <div className="page-container grid gap-10 md:grid-cols-[1.3fr_1fr_1fr]">
           <div><Brand inverse /><p className="mt-4 max-w-sm text-sm leading-6 text-surface/65">Dale una nueva vida a lo que ya no usas. Una experiencia local pensada para compartir con confianza.</p></div>
           <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-fresh">Explora</p><div className="mt-4 flex flex-col gap-3 text-sm text-surface/75"><Link href="/explorar">Artículos disponibles</Link><Link href="/publicar">Publicar gratis</Link><Link href="/perfil">Mi cuenta</Link></div></div>
-          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-fresh">Piloto local</p><p className="mt-4 text-sm leading-6 text-surface/65">Las publicaciones, solicitudes y reservas se guardan en este entorno. Pagos y contacto todavía no están habilitados.</p></div>
+          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-fresh">Piloto local</p><p className="mt-4 text-sm leading-6 text-surface/65">Las publicaciones, solicitudes y reservas se guardan en este entorno. El pago y el acceso del receptor al contacto todavía no están habilitados.</p></div>
         </div>
       </footer>
       <MobileNav />

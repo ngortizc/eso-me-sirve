@@ -5,6 +5,14 @@ import { PostgresListingRepository } from "@/modules/listings/infrastructure/pos
 import { PostgresReservationRepository } from "@/modules/reservations/infrastructure/postgres-reservation-repository";
 import { PAYMENT_WINDOW_MS } from "@/modules/reservations/domain/reservation";
 import { getPostgresPool } from "@/shared/database/postgres";
+import { PRIVATE_CONTACT_CONSENT_VERSION } from "@/modules/private-contact/domain/private-contact";
+import { PrivateContactCipher } from "@/modules/private-contact/infrastructure/private-contact-crypto";
+
+const privateContactKey = randomBytes(32);
+process.env.PRIVATE_CONTACT_ACTIVE_KEY_VERSION = "1";
+process.env.PRIVATE_CONTACT_KEY_V1 = privateContactKey.toString("base64");
+delete process.env.PRIVATE_CONTACT_KEY_V1_FILE;
+const contactCipher = new PrivateContactCipher(new Map([[1, privateContactKey]]), 1);
 
 const ownerId = `reservation-owner-${randomUUID()}`;
 const requesterA = `reservation-a-${randomUUID()}`;
@@ -29,6 +37,7 @@ async function removePriorFixtures() {
       );
       await client.query("delete from reservation where listing_id=any($1::uuid[])", [ids]);
       await client.query("delete from article_request where listing_id=any($1::uuid[])", [ids]);
+      await client.query("delete from listing_private_contact where listing_id=any($1::uuid[])", [ids]);
       await client.query("delete from listing where id=any($1::uuid[])", [ids]);
     }
     await client.query(
@@ -43,6 +52,7 @@ async function removePriorFixtures() {
 function record(index: number): CreateListingRecord {
   return {
     id: listingIds[index]!, publicSlug: slugs[index]!, ownerId, status: "PUBLISHED",
+    privateContact: contactCipher.encrypt(listingIds[index]!, { phone: "+56933333333", deliveryMethod: "MEETING_POINT", location: "Punto ficticio de reserva", instructions: null }, PRIVATE_CONTACT_CONSENT_VERSION),
     fields: {
       title: `Artículo de reserva ${index}`,
       description: "Artículo gratuito utilizado para validar solicitudes y reservas persistentes en PostgreSQL.",
@@ -81,6 +91,7 @@ afterAll(async () => {
     );
     await client.query("delete from reservation where listing_id=any($1::uuid[])", [listingIds]);
     await client.query("delete from article_request where listing_id=any($1::uuid[])", [listingIds]);
+    await client.query("delete from listing_private_contact where listing_id=any($1::uuid[])", [listingIds]);
     await client.query("delete from listing where id=any($1::uuid[])", [listingIds]);
     await client.query("delete from identity_user where id=any($1::text[])", [userIds]);
     await client.query("commit");

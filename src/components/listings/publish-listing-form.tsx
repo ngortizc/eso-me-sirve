@@ -6,6 +6,7 @@ import { PhotoManager, type ManagedPhoto } from "@/components/photos/photo-manag
 import { Icon } from "@/components/ui/icon";
 import type { ListingTaxonomy } from "@/modules/listings/application/listing-repository";
 import { listingConditionLabels, listingConditions } from "@/modules/listings/domain/listing";
+import { deliveryMethodLabels, deliveryMethods } from "@/modules/private-contact/domain/private-contact";
 
 export function PublishListingForm({ taxonomy }: Readonly<{ taxonomy: ListingTaxonomy }>) {
   const router = useRouter();
@@ -60,6 +61,18 @@ export function PublishListingForm({ taxonomy }: Readonly<{ taxonomy: ListingTax
           <label><span className="field-label">Comuna</span><select className="field" name="communeCode" required defaultValue="" key={regionCode}><option value="" disabled>Selecciona una comuna</option>{communes.map((commune) => <option key={commune.code} value={commune.code}>{commune.name}</option>)}</select></label>
         </div>
         <p className="flex items-start gap-2 rounded-xl bg-surface-strong p-3 text-xs leading-5 text-muted"><Icon className="mt-0.5 size-4 shrink-0 text-green-deep" name="lock" />La ubicación pública se limita a región y comuna. No escribas teléfono, correo, calle ni número.</p>
+        <section className="rounded-card border border-green-deep/20 bg-mint/50 p-5" aria-labelledby="publish-contact-heading">
+          <h2 className="text-xl font-black" id="publish-contact-heading">Datos privados para coordinar el retiro</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">Recopilamos teléfono y lugar de entrega para coordinar el retiro. No aparecerán en el catálogo ni se entregarán a solicitantes o reservas sin pago. Solo podrán compartirse con el receptor seleccionado después de un pago confirmado; el acceso futuro podrá registrarse.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label><span className="field-label">Teléfono chileno</span><input className="field" name="contactPhone" type="tel" required autoComplete="tel" placeholder="+56 9 1234 5678" /></label>
+            <label><span className="field-label">Modalidad de entrega</span><select className="field" name="deliveryMethod" required defaultValue=""><option value="" disabled>Selecciona una modalidad</option>{deliveryMethods.map((method) => <option value={method} key={method}>{deliveryMethodLabels[method]}</option>)}</select></label>
+            <label className="sm:col-span-2"><span className="field-label">Dirección o punto de retiro</span><textarea className="field min-h-24" name="deliveryLocation" required minLength={5} maxLength={300} placeholder="Escribe la dirección o describe claramente el punto de encuentro" /></label>
+            <label className="sm:col-span-2"><span className="field-label">Indicaciones adicionales (opcional)</span><textarea className="field min-h-20" name="deliveryInstructions" maxLength={500} /></label>
+            <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-ink/10 bg-white p-4 text-sm leading-6"><input className="mt-1 size-4" type="checkbox" name="contactConsent" value="true" required /><span>Acepto el tratamiento protegido y la futura compartición con el receptor seleccionado únicamente después de un pago confirmado.</span></label>
+          </div>
+          <p className="mt-3 text-xs text-muted">Puedes guardar un borrador sin completar esta sección. Será obligatoria antes de publicar.</p>
+        </section>
       </div>
       <aside className="h-fit rounded-card bg-ink p-5 text-white lg:sticky lg:top-24 sm:p-6">
         <span className="grid size-11 place-items-center rounded-2xl bg-fresh/20 text-fresh"><Icon className="size-6" name="sparkle" /></span>

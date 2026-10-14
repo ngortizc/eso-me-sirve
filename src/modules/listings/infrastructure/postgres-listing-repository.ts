@@ -23,7 +23,7 @@ type PublicRow = QueryResultRow & {
 type OwnerRow = QueryResultRow & {
   id: string; slug: string; title: string; description: string | null; status: ListingStatus;
   condition: ListingCondition | null; category_slug: string | null; region_code: string | null;
-  commune_code: string | null; updated_at: Date; version: number;
+  commune_code: string | null; updated_at: Date; version: number; private_contact_complete: boolean;
 };
 
 type PhotoRow = QueryResultRow & {
@@ -31,13 +31,13 @@ type PhotoRow = QueryResultRow & {
 };
 
 export class ListingAccessError extends Error {
-  constructor(public readonly reason: "NOT_FOUND" | "FORBIDDEN" | "INVALID_STATE" | "LAST_PHOTO") {
+  constructor(public readonly reason: "NOT_FOUND" | "FORBIDDEN" | "INVALID_STATE" | "LAST_PHOTO" | "CONTACT_REQUIRED") {
     super(reason);
     this.name = "ListingAccessError";
   }
 }
 
-const listingAccessReasons = new Set(["NOT_FOUND", "FORBIDDEN", "INVALID_STATE", "LAST_PHOTO"]);
+const listingAccessReasons = new Set(["NOT_FOUND", "FORBIDDEN", "INVALID_STATE", "LAST_PHOTO", "CONTACT_REQUIRED"]);
 
 export function isListingAccessError(error: unknown): error is ListingAccessError {
   if (!error || typeof error !== "object" || !("reason" in error)) return false;
@@ -157,6 +157,28 @@ export class PostgresListingRepository implements ListingRepository {
             photo.sourceWidth, photo.sourceHeight, photo.sourceMediaType, photo.sourceSha256, photo.processingVersion]
         );
       }
+      if (input.privateContact) {
+        const contact = input.privateContact;
+        await client.query(
+          `insert into listing_private_contact (
+            id, listing_id, delivery_method,
+            phone_ciphertext, phone_nonce, phone_auth_tag,
+            location_ciphertext, location_nonce, location_auth_tag,
+            instructions_ciphertext, instructions_nonce, instructions_auth_tag,
+            key_version, consent_version
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          [randomUUID(), input.id, contact.deliveryMethod,
+            contact.phone.ciphertext, contact.phone.nonce, contact.phone.authTag,
+            contact.location.ciphertext, contact.location.nonce, contact.location.authTag,
+            contact.instructions?.ciphertext ?? null, contact.instructions?.nonce ?? null, contact.instructions?.authTag ?? null,
+            contact.keyVersion, contact.consentVersion]
+        );
+        await client.query(
+          `insert into reservation_event (entity_type,entity_id,action,previous_state,new_state,actor_kind,actor_id,correlation_id)
+           values ('LISTING',$1,'PRIVATE_CONTACT_CREATED','MISSING','COMPLETE','USER',$2,$3)`,
+          [input.id, input.ownerId, randomUUID()]
+        );
+      }
       return { id: input.id, slug: input.publicSlug, status: input.status };
     });
   }
@@ -232,7 +254,8 @@ export class PostgresListingRepository implements ListingRepository {
   async getOwnerListings(ownerId: string): Promise<OwnerListing[]> {
     const listings = await getPostgresPool().query<OwnerRow>(
       `select l.id, l.public_slug as slug, l.title, l.description, l.status, l.condition,
-              c.slug as category_slug, loc.region_code, loc.commune_code, l.updated_at, l.version
+              c.slug as category_slug, loc.region_code, loc.commune_code, l.updated_at, l.version,
+              exists(select 1 from listing_private_contact pc where pc.listing_id=l.id) as private_contact_complete
        from listing l left join listing_category c on c.id = l.category_id
        left join listing_public_location loc on loc.listing_id = l.id
        where l.owner_id = $1 order by l.updated_at desc`,
@@ -247,6 +270,7 @@ export class PostgresListingRepository implements ListingRepository {
       id: row.id, slug: row.slug, title: row.title, description: row.description, status: row.status,
       condition: row.condition, categorySlug: row.category_slug, regionCode: row.region_code,
       communeCode: row.commune_code, updatedAt: row.updated_at.toISOString(), version: row.version,
+      privateContactComplete: row.private_contact_complete,
       photos: photos.rows.filter((photo) => photo.listing_id === row.id).map(photoView)
     }));
   }
@@ -265,6 +289,10 @@ export class PostgresListingRepository implements ListingRepository {
       if (!current) throw new ListingAccessError("NOT_FOUND");
       if (current.owner_id !== ownerId) throw new ListingAccessError("FORBIDDEN");
       if (!canTransitionListing(current.status, nextStatus)) throw new ListingAccessError("INVALID_STATE");
+      if (nextStatus === "PUBLISHED") {
+        const contact = await client.query("select 1 from listing_private_contact where listing_id=$1", [listingId]);
+        if (!contact.rows[0]) throw new ListingAccessError("CONTACT_REQUIRED");
+      }
       const updated = await client.query(
         `update listing set title=$3, description=$4,
            category_id=(select id from listing_category where slug=$5 and is_active), condition=$6, status=$7

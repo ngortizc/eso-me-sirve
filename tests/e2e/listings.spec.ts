@@ -18,6 +18,10 @@ async function publishFromUi(page: Page, title: string, photoPaths = [demoPhotos
   await page.getByLabel("Condición").selectOption("GOOD");
   await page.getByLabel("Región").selectOption("CL-RM");
   await page.getByLabel("Comuna").selectOption("13120");
+  await page.getByLabel("Teléfono chileno").fill("+56 9 1234 5678");
+  await page.getByLabel("Modalidad de entrega").selectOption("MEETING_POINT");
+  await page.getByLabel("Dirección o punto de retiro").fill("Entrada principal del centro comunitario de prueba");
+  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Publicar artículo" }).click();
   await expect(page).toHaveURL(/\/articulos\/[^?]+\?created=1$/);
   return new URL(page.url()).pathname.split("/").pop()!;
@@ -29,6 +33,7 @@ async function publishFromApi(page: Page, title: string) {
       intent: "publish", title,
       description: "Artículo gratuito en buen estado para validar autorización del propietario en el servidor.",
       categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", primaryPhotoIndex: "0",
+      contactPhone: "+56 9 1234 5678", deliveryMethod: "MEETING_POINT", deliveryLocation: "Punto ficticio de entrega", contactConsent: "true",
       photos: { name: "foto.png", mimeType: "image/png", buffer: tinyPng }
     }
   });
@@ -45,6 +50,7 @@ test("publica, persiste tras cerrar sesión, filtra y oculta al pausar", async (
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
   await page.request.post("/api/auth/sign-out");
+  await page.context().clearCookies();
   await page.goto(`/articulos/${slug}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
 
@@ -147,6 +153,40 @@ test("las respuestas públicas omiten propietario, contacto y claves físicas", 
   expect(text).not.toMatch(/storageKey|ownerId|phone|address|password|token/i);
 });
 
+test("protege, permite rectificar y no publica los datos privados", async ({ page }, testInfo) => {
+  const account = await registerVerifiedUser(page, `private-contact-${testInfo.project.name}`);
+  const title = uniqueTitle("Biblioteca con retiro privado");
+  const listing = await publishFromApi(page, title);
+  const ownerResponse = await page.request.get(`/api/listings/${listing.id}/private-contact`);
+  expect(ownerResponse.status()).toBe(200);
+  await expect(ownerResponse.json()).resolves.toMatchObject({ contact: { phone: "+56912345678", deliveryMethod: "MEETING_POINT", location: "Punto ficticio de entrega", version: 1 } });
+
+  await page.goto(`/mis-publicaciones/${listing.id}/editar`);
+  await expect(page.getByRole("heading", { name: "2. Datos privados para coordinar el retiro" })).toBeVisible();
+  await expect(page.getByLabel("Teléfono chileno")).toHaveValue("+56912345678");
+  const consent = page.getByRole("checkbox", { name: /Acepto que estos datos/ });
+  await expect(consent).not.toBeChecked();
+  await page.getByLabel("Dirección o descripción del punto de retiro").fill("Nuevo punto ficticio junto a la biblioteca");
+  await consent.check();
+  await page.getByRole("button", { name: "Actualizar datos privados" }).click();
+  await expect(page.getByText("Datos privados guardados correctamente.")).toBeVisible();
+  const evidenceDirectory = join(process.cwd(), "evidencias", "EMS-005A");
+  await mkdir(evidenceDirectory, { recursive: true });
+  await page.screenshot({ path: join(evidenceDirectory, `${testInfo.project.name}-contacto-privado-propietario.png`), fullPage: true, caret: "initial" });
+
+  const publicJson = await (await page.request.get(`/api/listings?q=${encodeURIComponent(title)}`)).text();
+  expect(publicJson).not.toContain("+56912345678");
+  expect(publicJson).not.toContain("Nuevo punto ficticio");
+  await page.request.post("/api/auth/sign-out");
+  await page.context().clearCookies();
+  await page.goto(`/articulos/${listing.slug}`);
+  const publicHtml = await page.content();
+  expect(publicHtml).not.toContain(account.email);
+  expect(publicHtml).not.toContain("+56912345678");
+  expect(publicHtml).not.toContain("Nuevo punto ficticio");
+  expect((await page.request.get(`/api/listings/${listing.id}/private-contact`)).status()).toBe(401);
+});
+
 test("edita, administra fotografías y retira sin bloquear el formulario", async ({ page }, testInfo) => {
   await registerVerifiedUser(page, `listing-editing-${testInfo.project.name}`);
   const originalTitle = uniqueTitle("Estante ficticio editable");
@@ -157,7 +197,7 @@ test("edita, administra fotografías y retira sin bloquear el formulario", async
   const changedTitle = uniqueTitle("Estante ficticio corregido");
   const changedDescription = "Descripción actualizada y persistente para validar que el formulario se libera después de guardar.";
   await page.getByLabel("Título").fill(changedTitle);
-  await page.getByLabel("Descripción").fill(changedDescription);
+  await page.locator('textarea[name="description"]').fill(changedDescription);
   await page.route("**/api/listings/*", async (route) => route.fulfill({ status: 500, contentType: "text/plain", body: "fallo simulado" }), { times: 1 });
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.getByText("El servidor respondió 500 sin un mensaje válido.")).toBeVisible();
@@ -167,7 +207,7 @@ test("edita, administra fotografías y retira sin bloquear el formulario", async
   await expect(page.getByRole("button", { name: "Guardar cambios" })).toBeEnabled();
   await page.reload();
   await expect(page.getByLabel("Título")).toHaveValue(changedTitle);
-  await expect(page.getByLabel("Descripción")).toHaveValue(changedDescription);
+  await expect(page.locator('textarea[name="description"]')).toHaveValue(changedDescription);
 
   await page.getByRole("button", { name: "Hacer principal" }).nth(1).click();
   await expect(page.getByText("Fotografía principal actualizada correctamente.")).toBeVisible();
@@ -238,6 +278,23 @@ test("rechaza publicar un borrador sin fotografías", async ({ page }) => {
   });
   expect(publish.status()).toBe(400);
   await expect(publish.json()).resolves.toMatchObject({ error: "Revisa los datos ingresados." });
+});
+
+test("permite borrador sin contacto e impide publicar sin datos privados", async ({ page }) => {
+  await registerVerifiedUser(page, "listing-private-contact-required");
+  const title = uniqueTitle("Borrador sin contacto privado");
+  const draft = await page.request.post("/api/listings", { multipart: { intent: "draft", title, primaryPhotoIndex: "0" } });
+  expect(draft.status()).toBe(201);
+  const publish = await page.request.post("/api/listings", {
+    multipart: {
+      intent: "publish", title,
+      description: "Artículo ficticio completo para comprobar que publicar requiere datos privados protegidos.",
+      categorySlug: "hogar", condition: "GOOD", regionCode: "CL-RM", communeCode: "13120", primaryPhotoIndex: "0",
+      photos: { name: "foto.png", mimeType: "image/png", buffer: tinyPng }
+    }
+  });
+  expect(publish.status()).toBe(400);
+  await expect(publish.json()).resolves.toMatchObject({ error: "Revisa los datos privados de entrega." });
 });
 
 test("captura publicación y catálogo reales", async ({ page }, testInfo) => {

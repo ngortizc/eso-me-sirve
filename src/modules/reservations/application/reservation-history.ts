@@ -11,7 +11,9 @@ const eventDescriptions: Readonly<Record<string, string>> = {
   AVAILABILITY_RESERVED: "Artículo reservado para el receptor seleccionado",
   AVAILABILITY_RELEASED: "Artículo disponible nuevamente",
   OWNER_STATUS_CHANGED: "Disponibilidad de la publicación actualizada",
-  OWNER_REMOVED_LISTING: "Publicación retirada definitivamente"
+  OWNER_REMOVED_LISTING: "Publicación retirada definitivamente",
+  PRIVATE_CONTACT_CREATED: "Datos privados de entrega registrados",
+  PRIVATE_CONTACT_UPDATED: "Datos privados de entrega actualizados"
 };
 
 const fallbackDescriptions: Readonly<Record<ReservationEventView["entityType"], string>> = {

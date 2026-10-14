@@ -3,6 +3,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CreateListingRecord } from "@/modules/listings/application/listing-repository";
 import { PostgresListingRepository } from "@/modules/listings/infrastructure/postgres-listing-repository";
 import { getPostgresPool } from "@/shared/database/postgres";
+import { PRIVATE_CONTACT_CONSENT_VERSION } from "@/modules/private-contact/domain/private-contact";
+import { PrivateContactCipher } from "@/modules/private-contact/infrastructure/private-contact-crypto";
+
+const privateContactKey = randomBytes(32);
+process.env.PRIVATE_CONTACT_ACTIVE_KEY_VERSION = "1";
+process.env.PRIVATE_CONTACT_KEY_V1 = privateContactKey.toString("base64");
+delete process.env.PRIVATE_CONTACT_KEY_V1_FILE;
+const contactCipher = new PrivateContactCipher(new Map([[1, privateContactKey]]), 1);
 
 const ownerId = `integration-owner-${randomUUID()}`;
 const otherId = `integration-other-${randomUUID()}`;
@@ -30,6 +38,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await getPostgresPool().query("delete from reservation_event where actor_id=any($1::text[])", [[ownerId, otherId]]);
+  await getPostgresPool().query("delete from listing_private_contact where listing_id=$1", [listingId]);
   await getPostgresPool().query("delete from listing where id=$1", [listingId]);
   await getPostgresPool().query("delete from identity_user where id=any($1::text[])", [[ownerId, otherId]]);
 });
@@ -38,6 +47,7 @@ describe("persistencia y autorización de publicaciones", () => {
   it("persiste una publicación y la recupera con una nueva instancia de repositorio", async () => {
     const record: CreateListingRecord = {
       id: listingId, publicSlug: slug, ownerId, status: "PUBLISHED", fields,
+      privateContact: contactCipher.encrypt(listingId, { phone: "+56911111111", deliveryMethod: "MEETING_POINT", location: "Punto de prueba aislado", instructions: null }, PRIVATE_CONTACT_CONSENT_VERSION),
       photos: [{
         id: randomUUID(), storageKey, position: 0, isPrimary: true, mediaType: "image/webp",
         sourceMediaType: "image/jpeg", sourceWidth: 1200, sourceHeight: 900,

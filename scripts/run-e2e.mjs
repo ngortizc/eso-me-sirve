@@ -1,8 +1,19 @@
 import { spawn, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import process from "node:process";
 
 const port = 3100;
 const isWindows = process.platform === "win32";
+const e2eKeyPath = process.env.CI ? ".data/e2e-private-contact-key" : ".data/secrets/private-contact-key-v1";
+mkdirSync(dirname(e2eKeyPath), { recursive: true, mode: 0o700 });
+if (!existsSync(e2eKeyPath)) {
+  if (!process.env.CI) throw new Error("Falta la clave local compartida. Ejecuta npm run dev:init-contact-key antes de las pruebas E2E.");
+  writeFileSync(e2eKeyPath, randomBytes(32).toString("base64"), { encoding: "utf8", mode: 0o600 });
+}
+try { chmodSync(e2eKeyPath, 0o600); } catch { /* Windows aplica ACL del usuario al directorio local. */ }
+const e2ePrivateContactKey = readFileSync(e2eKeyPath, "utf8").trim();
 const runtimeEnvironment = {
   ...process.env,
   NEXT_TELEMETRY_DISABLED: "1",
@@ -10,8 +21,11 @@ const runtimeEnvironment = {
   APP_ENV: "development",
   EMAIL_DELIVERY_MODE: "database",
   E2E_BUILD: "1",
-  PHOTO_STORAGE_ROOT: ".data/listing-photos"
+  PHOTO_STORAGE_ROOT: ".data/listing-photos",
+  PRIVATE_CONTACT_ACTIVE_KEY_VERSION: "1",
+  PRIVATE_CONTACT_KEY_V1: e2ePrivateContactKey
 };
+delete runtimeEnvironment.PRIVATE_CONTACT_KEY_V1_FILE;
 
 const build = spawnSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], {
   env: runtimeEnvironment,

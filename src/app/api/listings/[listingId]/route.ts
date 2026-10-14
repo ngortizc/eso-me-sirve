@@ -10,6 +10,7 @@ type Context = { params: Promise<{ listingId: string }> };
 function accessResponse(error: ListingAccessError) {
   if (error.reason === "FORBIDDEN") return NextResponse.json({ error: "No tienes permiso para administrar esta publicación." }, { status: 403 });
   if (error.reason === "NOT_FOUND") return NextResponse.json({ error: "Publicación no encontrada." }, { status: 404 });
+  if (error.reason === "CONTACT_REQUIRED") return NextResponse.json({ error: "Completa los datos privados de contacto y entrega antes de publicar." }, { status: 409 });
   return NextResponse.json({ error: "La operación no es válida para el estado actual." }, { status: 409 });
 }
 

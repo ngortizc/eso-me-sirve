@@ -3,6 +3,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CreateListingRecord } from "@/modules/listings/application/listing-repository";
 import { PostgresListingRepository } from "@/modules/listings/infrastructure/postgres-listing-repository";
 import { getPostgresPool } from "@/shared/database/postgres";
+import { PRIVATE_CONTACT_CONSENT_VERSION } from "@/modules/private-contact/domain/private-contact";
+import { PrivateContactCipher } from "@/modules/private-contact/infrastructure/private-contact-crypto";
+
+const privateContactKey = randomBytes(32);
+process.env.PRIVATE_CONTACT_ACTIVE_KEY_VERSION = "1";
+process.env.PRIVATE_CONTACT_KEY_V1 = privateContactKey.toString("base64");
+delete process.env.PRIVATE_CONTACT_KEY_V1_FILE;
+const contactCipher = new PrivateContactCipher(new Map([[1, privateContactKey]]), 1);
 
 const ownerId = `editing-owner-${randomUUID()}`;
 const otherId = `editing-other-${randomUUID()}`;
@@ -34,6 +42,7 @@ async function createListing(status: "DRAFT" | "PUBLISHED" = "PUBLISHED", photoC
   listingIds.push(id);
   const record: CreateListingRecord = {
     id, publicSlug: `edicion-ficticia-${randomBytes(6).toString("hex")}`, ownerId, status, fields,
+    privateContact: contactCipher.encrypt(id, { phone: "+56922222222", deliveryMethod: "MEETING_POINT", location: "Lugar ficticio de integración", instructions: null }, PRIVATE_CONTACT_CONSENT_VERSION),
     photos: Array.from({ length: photoCount }, (_, index) => photo(index))
   };
   await new PostgresListingRepository().create(record);
@@ -51,6 +60,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await getPostgresPool().query("delete from reservation_event where actor_id=any($1::text[])", [[ownerId, otherId]]);
+  await getPostgresPool().query("delete from listing_private_contact where listing_id=any($1::uuid[])", [listingIds]);
   await getPostgresPool().query("delete from listing where id=any($1::uuid[])", [listingIds]);
   await getPostgresPool().query("delete from listing_storage_cleanup where storage_key=any($1::text[])", [storageKeys]);
   await getPostgresPool().query("delete from identity_user where id=any($1::text[])", [[ownerId, otherId]]);

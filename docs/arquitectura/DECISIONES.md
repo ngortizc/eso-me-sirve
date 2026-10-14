@@ -19,4 +19,6 @@
 | ADR-015 | APROBADA | Reserva `PENDING_PAYMENT` por 24 horas exactas, hora PostgreSQL y expiración idempotente | EMS-NEG-012; sin pago ni contacto en EMS-004 |
 | ADR-016 | APROBADA | Reemplazo fotográfico con nuevo ID y limpieza compensable; IP solo desde proxy confiable | EMS-004.1; Caddy es el único ingreso productivo |
 | ADR-017 | APROBADA | Solicitudes no seleccionadas permanecen `PENDING` y su disponibilidad se deriva; nombre/alias es identidad pública mínima | EMS-004.3; sin prioridad, pago ni contacto |
-| ADR-018 | APROBADA | El publicador define contacto y dirección o punto de retiro privados al publicar; puede actualizarlos antes de habilitar el pago | EMS-005 almacenará y autorizará el acceso solo al receptor seleccionado tras pago confirmado; aún no implementado |
+| ADR-018 | APROBADA | El publicador define contacto y dirección o punto de retiro privados al publicar | EMS-005A almacena; ADR-020 precisa la congelación durante reserva; desbloqueo posterior a pago sigue pendiente |
+| ADR-019 | APROBADA | Contacto privado cifrado por publicación con AES-256-GCM, claves externas versionadas y autorización exclusiva del propietario en EMS-005A | Sin pago, webhook ni `ContactGrant` activo; rotación y retención operativa pendientes |
+| ADR-020 | APROBADA | Contacto privado de solo lectura para el propietario mientras exista una reserva `PENDING_PAYMENT` | EMS-005A.1; nueva edición tras cancelación/vencimiento, regla posterior al pago pendiente para EMS-005C |

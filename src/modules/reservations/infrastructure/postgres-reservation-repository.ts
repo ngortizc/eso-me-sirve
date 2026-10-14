@@ -12,7 +12,7 @@ import { CONNECTION_SERVICE_FEE_CLP, requestSelectionAvailability } from "../dom
 import { publicAlias } from "@/modules/identity/domain/public-alias";
 import { getPostgresPool } from "@/shared/database/postgres";
 
-export type ReservationAccessReason = "NOT_FOUND" | "FORBIDDEN" | "OWN_LISTING" | "DUPLICATE" | "INVALID_STATE" | "CONFLICT" | "EXPIRED";
+export type ReservationAccessReason = "NOT_FOUND" | "FORBIDDEN" | "OWN_LISTING" | "DUPLICATE" | "INVALID_STATE" | "CONFLICT" | "EXPIRED" | "CONTACT_REQUIRED";
 
 export class ReservationAccessError extends Error {
   constructor(public readonly reason: ReservationAccessReason) {
@@ -21,7 +21,7 @@ export class ReservationAccessError extends Error {
   }
 }
 
-const accessReasons = new Set<ReservationAccessReason>(["NOT_FOUND", "FORBIDDEN", "OWN_LISTING", "DUPLICATE", "INVALID_STATE", "CONFLICT", "EXPIRED"]);
+const accessReasons = new Set<ReservationAccessReason>(["NOT_FOUND", "FORBIDDEN", "OWN_LISTING", "DUPLICATE", "INVALID_STATE", "CONFLICT", "EXPIRED", "CONTACT_REQUIRED"]);
 
 export function isReservationAccessError(error: unknown): error is ReservationAccessError {
   return Boolean(error && typeof error === "object" && "reason" in error && accessReasons.has((error as { reason: ReservationAccessReason }).reason));
@@ -209,6 +209,8 @@ export class PostgresReservationRepository implements ReservationRepository {
         if (!request) throw new ReservationAccessError("NOT_FOUND");
         if (request.owner_id !== input.actorId) throw new ReservationAccessError("FORBIDDEN");
         if (request.request_status !== "PENDING" || request.listing_status !== "PUBLISHED") throw new ReservationAccessError("INVALID_STATE");
+        const privateContact = await client.query("select 1 from listing_private_contact where listing_id=$1", [request.listing_id]);
+        if (!privateContact.rows[0]) throw new ReservationAccessError("CONTACT_REQUIRED");
 
         const nowResult = await client.query<{ accepted_at: Date; payment_expires_at: Date }>(
           "select CURRENT_TIMESTAMP as accepted_at, CURRENT_TIMESTAMP + interval '24 hours' as payment_expires_at"

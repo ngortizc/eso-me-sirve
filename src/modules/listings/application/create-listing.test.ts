@@ -18,6 +18,15 @@ const stored: StoredListingPhoto = {
   catalog: { width: 100, height: 100, byteSize: 20 }, detail: { width: 100, height: 100, byteSize: 30 }
 };
 
+const privateContact = {
+  deliveryMethod: "MEETING_POINT" as const,
+  phone: { ciphertext: new Uint8Array([1]), nonce: new Uint8Array(12), authTag: new Uint8Array(16) },
+  location: { ciphertext: new Uint8Array([2]), nonce: new Uint8Array(12), authTag: new Uint8Array(16) },
+  instructions: null,
+  keyVersion: 1,
+  consentVersion: "test-v1"
+};
+
 function dependencies() {
   const repository: ListingRepository = {
     consumeUploadQuota: vi.fn().mockResolvedValue(true),
@@ -39,7 +48,7 @@ describe("CreateListing", () => {
     const { repository, storage } = dependencies();
     await new CreateListing(repository, storage).execute({
       ownerId: "session-user", intent: "publish", fields,
-      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0
+      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0, privateContact
     });
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ ownerId: "session-user", status: "PUBLISHED" }));
   });
@@ -49,7 +58,7 @@ describe("CreateListing", () => {
     vi.mocked(storage.store).mockRejectedValue(new Error("storage unavailable"));
     await expect(new CreateListing(repository, storage).execute({
       ownerId: "session-user", intent: "publish", fields,
-      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0
+      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0, privateContact
     })).rejects.toThrow("storage unavailable");
     expect(repository.create).not.toHaveBeenCalled();
   });
@@ -59,8 +68,17 @@ describe("CreateListing", () => {
     vi.mocked(repository.create).mockRejectedValue(new Error("db failed"));
     await expect(new CreateListing(repository, storage).execute({
       ownerId: "session-user", intent: "publish", fields,
-      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0
+      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0, privateContact
     })).rejects.toThrow("db failed");
     expect(storage.delete).toHaveBeenCalledWith(stored.storageKey);
+  });
+
+  it("permite borrador sin contacto y bloquea publicación sin contacto", async () => {
+    const { repository, storage } = dependencies();
+    await new CreateListing(repository, storage).execute({ ownerId: "session-user", intent: "draft", fields, photos: [], primaryPhotoIndex: 0 });
+    await expect(new CreateListing(repository, storage).execute({
+      ownerId: "session-user", intent: "publish", fields,
+      photos: [{ bytes: new Uint8Array([1]), declaredMediaType: "image/jpeg", originalFileName: "foto.jpg" }], primaryPhotoIndex: 0
+    })).rejects.toMatchObject({ errors: expect.arrayContaining([expect.objectContaining({ field: "privateContact" })]) });
   });
 });
